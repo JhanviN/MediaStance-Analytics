@@ -1,70 +1,52 @@
-# 📡 TradePulse — Economic Power Shift Detector
+# TradePulse — Bilateral economic news (NLP track)
 
-> NLP × Geopolitics × Public Journalism | Phase 1 & 2 Demo
+## Primary: supervised NLP pipeline (current work)
 
-## What it does
+**Step 1 — Data collection (live RSS, four target pairs)**
 
-TradePulse detects shifts in bilateral economic leverage between nations by combining:
-1. **Trade Dependency Asymmetry** — World Bank bilateral trade data  
-2. **Bilateral News Sentiment** — FinBERT fine-tuned on economic news  
-3. **Policy Stance Divergence** — RoBERTa on govt press releases (Phase 2)
+Target pairs are fixed in `nlp/corpus_pairs.py`: **IN–CN, IN–US, CN–US, IN–RU** (edit there if your advisor wants a different slice).
 
-Output: A **Leverage Score (0–10)** per country pair with plain-English explanation.
-
-## Quick Start
-
-### Option A: Google Colab (recommended for demo)
-1. Open `TradePulse_Demo.ipynb` in Google Colab
-2. Set Runtime → T4 GPU
-3. Run all cells in order
-4. See live FinBERT output in Cell 3 + 4
-
-### Option B: Local Streamlit app
 ```bash
 pip install -r requirements.txt
+python scripts/collect_corpus.py              # writes data/raw_headlines.csv
+python scripts/collect_corpus.py --feeds 50 --merge   # grow corpus over multiple runs
+```
+
+**Live sources:** (1) wire RSS in `core/config.py`, (2) **four Google News search RSS feeds** in `nlp/supplemental_feeds.py` so each headline is tied to one target pair (wire items alone rarely mention both countries). Use `--no-gnews` to disable (2). Use `--days 90` if the wire slice is too thin.
+
+Output schema: `id`, `headline`, `country_1`, `country_2`, `source`, `url`, `published_at`, `text` (UTF-8 BOM CSV for Excel).
+
+**Next steps (not automated yet):** add column `label` → `data/labeled_dataset.csv`, then `train.csv` / `test.csv`, TF-IDF baseline, transformer fine-tune, evaluation scripts (see conversation spec).
+
+---
+
+## Legacy: RSS + FinBERT + trade snapshot (optional)
+
+| Stage | Implementation |
+|--------|------------------|
+| Ingest | RSS (`core/config.py`), 30-day window |
+| NLP | FinBERT zero-shot (`core/sentiment.py`) |
+| Structure | `data/trade_snapshot.json` |
+| Score | Two-pillar 0–10 in `core/leverage_engine.py` (not part of the NLP-classification thesis) |
+
+```bash
+python run_pipeline.py --no-wb
 streamlit run demo/demo_app.py
 ```
 
-## Project Structure
+## Layout (excerpt)
+
 ```
-tradepulse/
-├── core/
-│   ├── news_fetcher.py      # RSS feed fetcher + country pair filter
-│   ├── sentiment.py         # FinBERT bilateral sentiment classifier
-│   └── leverage_engine.py   # Leverage Signal formula + scoring
-├── demo/
-│   └── demo_app.py          # Streamlit live demo app
-├── TradePulse_Demo.ipynb    # Colab notebook (self-contained demo)
-└── requirements.txt
+nlp/corpus_pairs.py       # four target bilateral pairs
+scripts/collect_corpus.py # Step 1 → data/raw_headlines.csv
+data/raw_headlines.csv    # created by collector (UTF-8 BOM for Excel)
+core/news_fetcher.py      # RSS fetch + country mention heuristics
 ```
 
-## Supported Country Pairs
-India↔China | India↔USA | India↔Russia | India↔EU  
-China↔USA | India↔Bangladesh | India↔Japan | India↔Saudi Arabia
+## Expanding beyond four pairs
 
-## Tech Stack
-| Layer | Tool |
-|---|---|
-| Sentiment NLP | ProsusAI/FinBERT (HuggingFace) |
-| NER / routing | spaCy en_core_web_lg |
-| News corpus | GDELT 2.0 + RSS (Reuters, PIB, BBC) |
-| Data pipeline | Python + feedparser + requests |
-| Trade data | World Bank API (static snapshot for demo) |
-| Backend | FastAPI (Phase 3) |
-| Frontend | React + D3.js (Phase 4) |
+Add a tuple to `CORPUS_TARGET_PAIRS` **and** ensure `data/trade_snapshot.json` has a block if you still run the legacy leverage pipeline; the NLP track only needs the collector pair list.
 
-## Leverage Formula
-```
-Leverage(A,B) = 0.40 × TradeAsymmetry(A,B)
-              + 0.35 × SentimentDelta(A,B)    ← FinBERT NLP
-              + 0.25 × StanceDivergence(A,B)  ← RoBERTa NLP
-→ Scaled to 0–10
-```
+## Legacy trade snapshot
 
-## Roadmap
-- [x] Phase 1: Data pipeline + RSS fetcher + corpus design  
-- [x] Phase 2 (demo): FinBERT zero-shot bilateral sentiment  
-- [ ] Phase 2 (complete): Fine-tune on 3,000 labelled articles  
-- [ ] Phase 3: Leverage Signal engine + LLM explanations  
-- [ ] Phase 4: React frontend + D3.js choropleth map  
-- [ ] Phase 5: User study + ablation + major report  
+Edit `data/trade_snapshot.json` only with cited statistics; used by `run_pipeline.py` / Streamlit path only.

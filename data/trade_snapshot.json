@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "description": "Bilateral export shares: fraction of each country's total goods exports going to the partner. Update yearly with cited source.",
+    "year_hint": 2022,
+    "note": "EU treated as aggregate partner where noted. Values are illustrative teaching-grade snapshots — replace with WITS/Comtrade pulls for publication."
+  },
+  "pairs": {
+    "BD-IN": {
+      "iso_low": "BD",
+      "iso_high": "IN",
+      "share_low_to_high": 0.021,
+      "share_high_to_low": 0.034
+    },
+    "CN-IN": {
+      "iso_low": "CN",
+      "iso_high": "IN",
+      "share_low_to_high": 0.032,
+      "share_high_to_low": 0.034
+    },
+    "CN-US": {
+      "iso_low": "CN",
+      "iso_high": "US",
+      "share_low_to_high": 0.085,
+      "share_high_to_low": 0.168
+    },
+    "EU-IN": {
+      "iso_low": "EU",
+      "iso_high": "IN",
+      "share_low_to_high": 0.018,
+      "share_high_to_low": 0.121
+    },
+    "EU-US": {
+      "iso_low": "EU",
+      "iso_high": "US",
+      "share_low_to_high": 0.201,
+      "share_high_to_low": 0.189
+    },
+    "IN-JP": {
+      "iso_low": "IN",
+      "iso_high": "JP",
+      "share_low_to_high": 0.029,
+      "share_high_to_low": 0.023
+    },
+    "AU-IN": {
+      "iso_low": "AU",
+      "iso_high": "IN",
+      "share_low_to_high": 0.048,
+      "share_high_to_low": 0.043
+    },
+    "IN-RU": {
+      "iso_low": "IN",
+      "iso_high": "RU",
+      "share_low_to_high": 0.021,
+      "share_high_to_low": 0.189
+    },
+    "IN-SA": {
+      "iso_low": "IN",
+      "iso_high": "SA",
+      "share_low_to_high": 0.031,
+      "share_high_to_low": 0.221
+    },
+    "IN-US": {
+      "iso_low": "IN",
+      "iso_high": "US",
+      "share_low_to_high": 0.178,
+      "share_high_to_low": 0.021
+    }
+  }
+}

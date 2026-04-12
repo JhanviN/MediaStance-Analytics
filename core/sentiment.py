@@ -50,7 +50,7 @@ def load_model():
             truncation=True,
             max_length=512,
         )
-        print("Model loaded ✓")
+        print("Model loaded OK")
     return _classifier
 
 
