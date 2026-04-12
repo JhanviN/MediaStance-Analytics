@@ -1,0 +1,6 @@
+transformers==4.40.0
+torch==2.2.0
+feedparser==6.0.11
+streamlit==1.33.0
+requests==2.31.0
+pyngrok==7.1.6
