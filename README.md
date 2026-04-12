@@ -17,16 +17,33 @@ python scripts/collect_corpus.py --feeds 50 --merge   # grow corpus over multipl
 Output schema: `id`, `headline`, `country_1`, `country_2`, `source`, `url`, `published_at`, `text` (UTF-8 BOM for Excel). If the default path is locked, the script writes `data/raw_headlines_YYYYMMDD_HHMMSS.csv`.
 
 **Step 2 — Labeling (human)**  
-Build a sheet with an empty `label` column, then fill each row with exactly: `cooperative` | `neutral` | `adversarial` (wording only; unclear → neutral).
+Fill **`data/labeled_dataset.csv`** column `label` with exactly: `cooperative` | `neutral` | `adversarial` (wording only; unclear → neutral).
+
+**First time** (create sheet from raw):
 
 ```bash
-# From newest raw_headlines*.csv in data/
-python scripts/init_labeled_template.py --latest
-# Or from a specific file:
-python scripts/init_labeled_template.py -i data/raw_headlines_20260412_040641.csv
+python scripts/sync_labeled_dataset.py --latest
+# or: python scripts/init_labeled_template.py --latest
 ```
 
-Edit **`data/labeled_dataset.csv`** in Excel/Sheets (save as same UTF-8 CSV if possible).
+**After you fetch more raw data** (`collect_corpus.py --merge` …): **sync again** — same ids **keep your labels**; new ids get an empty `label`; ids that disappeared from this raw pull but were already labeled are **kept at the bottom** so you never lose work.
+
+```bash
+python scripts/collect_corpus.py --feeds 80 --merge
+python scripts/sync_labeled_dataset.py --latest
+```
+
+Close `labeled_dataset.csv` in Excel before sync/split if you see permission errors.
+
+**Cleaner `text` + optional full article body**  
+RSS/Google only ship short snippets — not the full article. The collector now collapses **near-duplicate** title/summary using word overlap (e.g. `… - ThePrint` vs `… ThePrint`). To pull **main body text** from each URL (slow, ~1s/row, some sites block bots):
+
+```bash
+pip install trafilatura
+python scripts/enrich_corpus_bodies.py -i data/raw_headlines.csv -o data/raw_headlines_enriched.csv --limit 10
+```
+
+Use `-o` as the input to `sync_labeled_dataset` / labeling when satisfied; `--limit` is for testing.
 
 **Step 3 — Train / test split (after labels are filled)**
 
@@ -70,3 +87,20 @@ Add a tuple to `CORPUS_TARGET_PAIRS` **and** ensure `data/trade_snapshot.json` h
 ## Legacy trade snapshot
 
 Edit `data/trade_snapshot.json` only with cited statistics; used by `run_pipeline.py` / Streamlit path only.
+
+
+
+
+
+
+
+
+python scripts/collect_corpus.py --feeds 80 --merge   # grow raw
+python scripts/sync_labeled_dataset.py --latest     # merge into labeled, keep labels
+# only fill NEW empty labels
+python scripts/split_data.py                          # when ready
+
+
+Later, when you add more raw rows: run collect_corpus.py --merge, then sync_labeled_dataset.py --latest again, then only label the new empty rows, then split_data.py again.
+
+Close the CSV in Excel before split_data.py if Windows locks the file.

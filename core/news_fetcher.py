@@ -7,6 +7,7 @@ Submission scope: RSS only. spaCy/GDELT are future upgrades.
 from __future__ import annotations
 
 import hashlib
+import html
 import re
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
@@ -66,8 +67,58 @@ def _parse_published(entry: dict) -> datetime:
         return datetime.now(timezone.utc)
 
 
+def clean_rss_text(s: str) -> str:
+    """Decode HTML entities, strip tags, normalize spaces (RSS/Google News snippets)."""
+    if not s:
+        return ""
+    s = html.unescape(str(s))
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = s.replace("\xa0", " ").replace("\u2009", " ").replace("\u2008", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
 def _strip_html(s: str) -> str:
-    return re.sub(r"<[^>]+>", " ", s).strip()
+    """Backward-compatible name for clean_rss_text."""
+    return clean_rss_text(s)
+
+
+def _word_jaccard(a: str, b: str) -> float:
+    """Token overlap — catches '... - ThePrint' vs '... ThePrint' duplicates."""
+    wa = set(re.findall(r"[\w']+", (a or "").lower()))
+    wb = set(re.findall(r"[\w']+", (b or "").lower()))
+    if not wa and not wb:
+        return 1.0
+    if not wa or not wb:
+        return 0.0
+    return len(wa & wb) / len(wa | wb)
+
+
+def build_article_text(title: str, summary: str) -> str:
+    """
+    Headline + optional extra context. RSS/Google often repeat the headline in the
+    summary with only punctuation or outlet wording changed — collapse to one line.
+    """
+    title = clean_rss_text(title or "")
+    summary = clean_rss_text(summary or "")
+    if not summary:
+        return title
+    if summary.lower() == title.lower():
+        return title
+    jac = _word_jaccard(title, summary)
+    # Same story twice (word sets ~ identical)
+    if jac >= 0.91:
+        return title
+    if title and summary.lower().startswith(title.lower()) and len(summary) <= len(title) + 120:
+        return title
+    # Summary is mostly a repeat of the title (long near-duplicate)
+    if jac >= 0.85 and len(summary) <= int(len(title) * 2.2) + 40:
+        return title
+    combined = f"{title}. {summary}"
+    # "Title. Title ..." from feed quirks
+    if title and combined.lower().count(title.lower()) >= 2 and len(summary) <= len(title) + 80:
+        return title
+    return combined
 
 
 def _stable_url(entry: dict, title: str, text: str) -> str:
@@ -88,10 +139,10 @@ def fetch_articles(max_per_feed: int = 20, max_age_days: int | None = None) -> L
         try:
             feed = feedparser.parse(url)
             for entry in feed.entries[:max_per_feed]:
-                title = (entry.get("title") or "").strip()
-                summary = entry.get("summary", entry.get("description", ""))
-                summary = _strip_html(str(summary).strip())
-                text = f"{title}. {summary}"
+                title_raw = (entry.get("title") or "").strip()
+                summary_raw = str(entry.get("summary", entry.get("description", "") or ""))
+                title = clean_rss_text(title_raw) or title_raw
+                text = build_article_text(title_raw, summary_raw)
                 pub_dt = _parse_published(entry)
                 if pub_dt < cutoff:
                     continue

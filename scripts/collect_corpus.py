@@ -31,7 +31,8 @@ if str(ROOT) not in sys.path:
 from core import config  # noqa: E402
 from core.news_fetcher import (  # noqa: E402
     _parse_published,
-    _strip_html,
+    build_article_text,
+    clean_rss_text,
     detect_countries,
     fetch_articles,
 )
@@ -107,9 +108,10 @@ def _collect_supplemental_rows(max_per_feed: int, max_age_days: int | None) -> L
             pub_dt = _parse_published(entry)
             if pub_dt < cutoff:
                 continue
-            title = (entry.get("title") or "").strip().replace("\n", " ")
-            summary = _strip_html(str(entry.get("summary", "") or ""))
-            text = f"{title}. {summary}"
+            title_raw = (entry.get("title") or "").strip().replace("\n", " ")
+            summary_raw = str(entry.get("summary", "") or "")
+            title = clean_rss_text(title_raw) or title_raw
+            text = build_article_text(title_raw, summary_raw)
             url = (entry.get("link") or "").strip() or f"urn:gn:{hash(text)}"
             pub = pub_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
             before = len(rows)
