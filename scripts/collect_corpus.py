@@ -7,7 +7,7 @@ emit one row per matching pair. Output: data/raw_headlines.csv
 
 Columns: id, headline, country_1, country_2, source, url, published_at, text
 
-Run from repository root:
+Run from repository root (default: last 90 days for wire + Google News feeds):
   python scripts/collect_corpus.py
   python scripts/collect_corpus.py --feeds 50 --merge
 """
@@ -18,6 +18,7 @@ import argparse
 import csv
 import hashlib
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -27,6 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from core import config  # noqa: E402
 from core.news_fetcher import (  # noqa: E402
     _parse_published,
     _strip_html,
@@ -84,8 +86,10 @@ def _append_row(
     )
 
 
-def _collect_supplemental_rows(max_per_feed: int) -> List[Dict[str, str]]:
-    """Google News search RSS: each feed is already scoped to one bilateral pair."""
+def _collect_supplemental_rows(max_per_feed: int, max_age_days: int | None) -> List[Dict[str, str]]:
+    """Google News search RSS: scoped to one pair; same max-age window as wire RSS."""
+    days = max_age_days if max_age_days is not None else config.MAX_ARTICLE_AGE_DAYS
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     rows: List[Dict[str, str]] = []
     seen_keys: Set[Tuple[str, str, str]] = set()
     for spec in SUPPLEMENTAL_PAIR_FEEDS:
@@ -96,12 +100,19 @@ def _collect_supplemental_rows(max_per_feed: int) -> List[Dict[str, str]]:
         except Exception as e:
             print(f"  [Warning] supplemental {spec['label']}: {e}")
             continue
-        for entry in feed.entries[:max_per_feed]:
+        added = 0
+        for entry in feed.entries:
+            if added >= max_per_feed:
+                break
+            pub_dt = _parse_published(entry)
+            if pub_dt < cutoff:
+                continue
             title = (entry.get("title") or "").strip().replace("\n", " ")
             summary = _strip_html(str(entry.get("summary", "") or ""))
             text = f"{title}. {summary}"
             url = (entry.get("link") or "").strip() or f"urn:gn:{hash(text)}"
-            pub = _parse_published(entry).strftime("%Y-%m-%dT%H:%M:%SZ")
+            pub = pub_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            before = len(rows)
             _append_row(
                 rows,
                 seen_keys,
@@ -113,6 +124,8 @@ def _collect_supplemental_rows(max_per_feed: int) -> List[Dict[str, str]]:
                 source=spec["label"],
                 published_at=pub,
             )
+            if len(rows) > before:
+                added += 1
     return rows
 
 
@@ -153,7 +166,7 @@ def _collect_rows(max_per_feed: int, max_age_days: int | None, skip_supplemental
     general = _collect_general_rows(max_per_feed, max_age_days)
     if skip_supplemental:
         return general
-    sup = _collect_supplemental_rows(max_per_feed)
+    sup = _collect_supplemental_rows(max_per_feed, max_age_days)
     seen = {(r["url"], r["country_1"], r["country_2"]) for r in general}
     for r in sup:
         k = (r["url"], r["country_1"], r["country_2"])
@@ -161,6 +174,31 @@ def _collect_rows(max_per_feed: int, max_age_days: int | None, skip_supplemental
             general.append(r)
             seen.add(k)
     return general
+
+
+def _write_csv(path: Path, rows: List[Dict[str, str]]) -> Path:
+    """Write UTF-8 BOM CSV. If path is locked (Excel/Cursor), write a timestamped file next to it."""
+    try:
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
+            w.writeheader()
+            for row in rows:
+                w.writerow({k: row.get(k, "") for k in FIELDNAMES})
+        return path
+    except PermissionError:
+        alt = path.parent / f"raw_headlines_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+        print(
+            f"\n[Permission denied] {path}\n"
+            f"  Close this file in Excel / another editor / IDE preview, then rerun.\n"
+            f"  Writing this run to: {alt}\n",
+            file=sys.stderr,
+        )
+        with open(alt, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
+            w.writeheader()
+            for row in rows:
+                w.writerow({k: row.get(k, "") for k in FIELDNAMES})
+        return alt
 
 
 def _load_existing_rows(path: Path) -> List[Dict[str, str]]:
@@ -178,8 +216,8 @@ def main() -> None:
         type=int,
         default=None,
         metavar="N",
-        help="Include headlines up to N days old (default: core.config.MAX_ARTICLE_AGE_DAYS). "
-        "Use 90–120 when a short window yields too few bilateral matches.",
+        help="Max age in days for all sources (default: core.config.MAX_ARTICLE_AGE_DAYS, "
+        "currently last ~3 months). Override only if you need a different window.",
     )
     ap.add_argument(
         "--no-gnews",
@@ -202,7 +240,9 @@ def main() -> None:
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    days = args.days if args.days is not None else config.MAX_ARTICLE_AGE_DAYS
     print(f"Target pairs ({len(CORPUS_TARGET_PAIRS)}): {CORPUS_TARGET_PAIRS}")
+    print(f"Max article age: {days} days (~3 months) | supplemental: {not args.no_gnews}")
     print("Fetching live RSS…")
     new_rows = _collect_rows(
         max_per_feed=args.feeds,
@@ -226,13 +266,8 @@ def main() -> None:
         out_rows = new_rows
         print(f"Collected {len(out_rows)} bilateral rows (this run only)")
 
-    with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
-        w.writeheader()
-        for row in out_rows:
-            w.writerow({k: row.get(k, "") for k in FIELDNAMES})
-
-    print(f"Wrote {out_path} ({len(out_rows)} rows)")
+    written = _write_csv(out_path, out_rows)
+    print(f"Wrote {written} ({len(out_rows)} rows)")
     by_pair: Dict[str, int] = {}
     for r in out_rows:
         k = f"{r['country_1']}-{r['country_2']}"

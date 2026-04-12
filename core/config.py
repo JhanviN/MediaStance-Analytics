@@ -36,5 +36,5 @@ RSS_FEEDS: dict[str, str] = {
 DEFAULT_DB_PATH = "data/tradepulse.db"
 TRADE_SNAPSHOT_PATH = "data/trade_snapshot.json"
 
-# Only ingest headlines newer than this (reduces stale RSS noise)
-MAX_ARTICLE_AGE_DAYS = 30
+# Corpus / RSS: drop items older than this (aligned to ~last 3 months for all pairs)
+MAX_ARTICLE_AGE_DAYS = 90
