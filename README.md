@@ -48,12 +48,59 @@ Use `-o` as the input to `sync_labeled_dataset` / labeling when satisfied; `--li
 **Step 3 — Train / test split (after labels are filled)**
 
 ```bash
-pip install scikit-learn   # if not already from requirements.txt
 python scripts/split_data.py              # → data/train.csv, data/test.csv (80/20 stratified)
 python scripts/split_data.py --test-size 0.25
 ```
 
-**Step 4+ (next implementation):** TF-IDF + Logistic Regression baseline, then transformer fine-tune + `scripts/evaluate.py`.
+**Step 4 — Train models**
+
+```bash
+python scripts/train_baseline.py          # TF-IDF + Logistic Regression → models/baseline_tfidf_lr.joblib
+python scripts/train_transformer.py       # Fine-tune DistilBERT (3 epochs default; use --epochs 1 for a quick test)
+python scripts/train_transformer.py --epochs 3 --batch-size 8
+```
+
+**Step 5 — Outputs:** `results/baseline_test_predictions.csv`, `results/transformer_test_predictions.csv`
+
+**Step 6 — Evaluation table**
+
+```bash
+python scripts/evaluate.py                # → results/evaluation_report.md
+```
+
+**Step 7 — Error analysis**
+
+```bash
+python scripts/error_analysis.py
+python scripts/error_analysis.py --pred results/baseline_test_predictions.csv
+```
+
+**Step 8 — Live prediction (CLI), SQLite log, weekly report, API**
+
+```bash
+# One headline → JSON with label + per-class probabilities (baseline and/or transformer)
+python scripts/predict.py -t "India and US hold trade talks amid tariff dispute"
+python scripts/predict.py -t "Headline here" --body "Optional extra snippet" --model baseline
+
+# Persist each run to SQLite (default path: data/predictions.db)
+python scripts/predict.py -t "..." --country1 IN --country2 US --save-db
+
+# Rolling summary: last N days vs prior N days (UTC), from predictions.db
+python scripts/generate_weekly_report.py
+python scripts/generate_weekly_report.py --days 7 --top 15
+
+# HTTP API (same models as the CLI)
+pip install fastapi uvicorn
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+# POST /classify  — body e.g. {"text":"...", "pair":"IN-US", "model":"baseline", "save": false}
+# Analytics (reads data/predictions.db; aggregates model=baseline by default):
+#   GET /summary?pair=IN-US   GET /summary/all   GET /distribution?pair=CN-US
+#   GET /trends?pair=IN-US&rolling=7   GET /headlines?pair=IN-US&label=adversarial
+#   GET /alerts   GET /compare?pair1=IN-US&pair2=CN-US
+# POST /classify/batch — up to 50 items: {"items":[{"text":"...","pair":"IN-US"}], "model":"baseline"}
+# OpenAPI: http://127.0.0.1:8000/docs
+# Full route list + headers + example responses: docs/API_ROUTES.md
+```
 
 ---
 
@@ -95,12 +142,4 @@ Edit `data/trade_snapshot.json` only with cited statistics; used by `run_pipelin
 
 
 
-python scripts/collect_corpus.py --feeds 80 --merge   # grow raw
-python scripts/sync_labeled_dataset.py --latest     # merge into labeled, keep labels
-# only fill NEW empty labels
-python scripts/split_data.py                          # when ready
-
-
-Later, when you add more raw rows: run collect_corpus.py --merge, then sync_labeled_dataset.py --latest again, then only label the new empty rows, then split_data.py again.
-
-Close the CSV in Excel before split_data.py if Windows locks the file.
+When you add more raw rows: `collect_corpus.py --merge`, then `sync_labeled_dataset.py --latest`, label only new empty rows, then `split_data.py` and retrain/eval as needed. Close the CSV in Excel on Windows if you see file lock errors.

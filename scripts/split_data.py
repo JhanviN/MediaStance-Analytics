@@ -108,8 +108,8 @@ def main() -> None:
                 w.writerow(r)
 
     print(f"Labeled rows used: {len(clean)}")
-    print(f"Train: {len(train)} → {args.train_out}")
-    print(f"Test:  {len(test)} → {args.test_out}")
+    print(f"Train: {len(train)} -> {args.train_out}")
+    print(f"Test:  {len(test)} -> {args.test_out}")
     print("Train label counts:", dict(Counter(r["label"] for r in train)))
     print("Test label counts: ", dict(Counter(r["label"] for r in test)))
 
