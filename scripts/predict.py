@@ -1,12 +1,4 @@
-#!/usr/bin/env python3
-"""
-Classify one headline/snippet with saved baseline and/or transformer.
 
-  python scripts/predict.py -t "India and US hold trade talks amid tariff dispute"
-  python scripts/predict.py -t "..." --model baseline --country1 IN --country2 US --save-db
-
---save-db appends a row to data/predictions.db (init schema on first use).
-"""
 
 from __future__ import annotations
 

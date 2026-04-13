@@ -1,18 +1,4 @@
-#!/usr/bin/env python3
-"""
-Keep manual labels when new raw headlines are fetched.
 
-- Reads latest (or chosen) raw_headlines*.csv
-- If data/labeled_dataset.csv exists: for each raw row, keep existing label when id matches;
-  new ids get an empty label; rows only in labeled (old id dropped from raw) stay at the end.
-- If no labeled file yet: same as a fresh copy with empty labels.
-
-Run after collect_corpus --merge so you never redo labeling for the same id.
-
-Examples:
-  python scripts/sync_labeled_dataset.py --latest
-  python scripts/sync_labeled_dataset.py -i data/raw_headlines_20260412_040641.csv
-"""
 
 from __future__ import annotations
 

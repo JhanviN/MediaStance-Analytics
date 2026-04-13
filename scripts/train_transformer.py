@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-STEP 4b — Fine-tune DistilBERT (3-class) on data/train.csv.
-
-During training, metrics use a **validation** slice (15% of train rows, stratified).
-**Test** (`data/test.csv`) is only used once at the end for `transformer_test_predictions.csv`
-— so test labels are not used to pick the best epoch.
-
-Requires: pip install datasets accelerate (accelerate often installed with transformers)
-
-Writes:
-  models/transformer_bilateral/  (config, tokenizer, pytorch_model.bin or safetensors)
-  results/transformer_test_predictions.csv
-"""
 
 from __future__ import annotations
 

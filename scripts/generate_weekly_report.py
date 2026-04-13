@@ -1,12 +1,4 @@
-#!/usr/bin/env python3
-"""
-Aggregate predictions.db for the last 7 days vs the previous 7 days.
 
-Requires rows written by: python scripts/predict.py ... --save-db
-(or your own inserts into the same schema).
-
-Output: results/weekly_report_YYYY-MM-DD.txt
-"""
 
 from __future__ import annotations
 

@@ -1,11 +1,4 @@
-#!/usr/bin/env python3
-"""
-Backward-compatible entry point — delegates to sync_labeled_dataset.py
 
-Use either:
-  python scripts/init_labeled_template.py --latest
-  python scripts/sync_labeled_dataset.py --latest
-"""
 
 from __future__ import annotations
 

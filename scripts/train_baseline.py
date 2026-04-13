@@ -1,12 +1,4 @@
-#!/usr/bin/env python3
-"""
-STEP 4a — TF-IDF + Logistic Regression baseline on data/train.csv
 
-Writes:
-  models/baseline_tfidf_lr.joblib
-  models/label_mapping.json
-  results/baseline_test_predictions.csv
-"""
 
 from __future__ import annotations
 

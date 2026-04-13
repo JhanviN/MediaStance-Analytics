@@ -1,7 +1,4 @@
-"""
-SQLite persistence for repeatable submission workflow:
-ingested articles + per-run pair scores (enables sentiment delta).
-"""
+
 
 from __future__ import annotations
 

@@ -1,10 +1,4 @@
-#!/usr/bin/env python3
-"""
-STEP 7 — Misclassification samples for the report.
 
-Reads results/transformer_test_predictions.csv (or --pred baseline file),
-writes results/error_analysis.md with up to N wrong examples.
-"""
 
 from __future__ import annotations
 

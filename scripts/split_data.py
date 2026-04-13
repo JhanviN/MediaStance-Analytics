@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
-"""
-STEP 3 — Stratified train / test split from labeled_dataset.csv.
 
-Requires every row to have label in {cooperative, neutral, adversarial}.
-Drops rows with blank or invalid labels (prints counts).
-
-Example:
-  python scripts/split_data.py
-  python scripts/split_data.py --test-size 0.25 --seed 42
-"""
 
 from __future__ import annotations
 

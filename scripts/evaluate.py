@@ -1,14 +1,3 @@
-#!/usr/bin/env python3
-"""
-STEP 6 — Evaluation tables from prediction CSVs (baseline + transformer).
-
-Reads:
-  results/baseline_test_predictions.csv
-  results/transformer_test_predictions.csv
-
-Writes:
-  results/evaluation_report.md
-"""
 
 from __future__ import annotations
 

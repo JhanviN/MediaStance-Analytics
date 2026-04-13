@@ -1,7 +1,4 @@
-"""
-Submission scope: pairs, feeds, and model weights.
-Edit `data/trade_snapshot.json` to refresh bilateral shares (cite source + year).
-"""
+
 
 from __future__ import annotations
 

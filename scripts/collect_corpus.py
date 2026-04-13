@@ -1,16 +1,4 @@
-#!/usr/bin/env python3
-"""
-STEP 1 — Collect bilateral headlines from live RSS (no dummy text).
 
-For each article, if BOTH countries of a target pair appear in the headline+summary,
-emit one row per matching pair. Output: data/raw_headlines.csv
-
-Columns: id, headline, country_1, country_2, source, url, published_at, text
-
-Run from repository root (default: last 90 days for wire + Google News feeds):
-  python scripts/collect_corpus.py
-  python scripts/collect_corpus.py --feeds 50 --merge
-"""
 
 from __future__ import annotations
 

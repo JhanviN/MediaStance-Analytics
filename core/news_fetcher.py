@@ -1,8 +1,3 @@
-"""
-RSS ingestion + lightweight country mention filter (keyword / alias based).
-
-Submission scope: RSS only. spaCy/GDELT are future upgrades.
-"""
 
 from __future__ import annotations
 

@@ -1,13 +1,4 @@
-#!/usr/bin/env python3
-"""
-RSS only gives short snippets. This script optionally pulls main text from each URL
-using trafilatura (HTML → article body). Slower; some sites block bots.
 
-  pip install trafilatura
-  python scripts/enrich_corpus_bodies.py -i data/raw_headlines.csv -o data/raw_headlines_enriched.csv --limit 5
-
-Google News redirect URLs often work; if extract returns empty, the row keeps the old text.
-"""
 
 from __future__ import annotations
 
