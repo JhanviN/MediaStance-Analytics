@@ -12,19 +12,22 @@ import feedparser
 
 from . import config
 
-# ── Country alias map (fast path for submission) ──────────────────────────────
+# ── Country alias map ─────────────────────────────────────────────────────────
 COUNTRY_ALIASES = {
     "IN": ["india", "indian", "new delhi", "modi", "delhi", "rbi", "pib"],
     "CN": ["china", "chinese", "beijing", "xi jinping", "pboc", "shanghai"],
     "US": ["united states", "u.s.", "america", "american", "washington", "biden", "trump", "fed reserve", "ustr"],
     "RU": ["russia", "russian", "moscow", "putin", "kremlin"],
+    "PK": ["pakistan", "pakistani", "islamabad", "lahore", "karachi", "imf pakistan"],
+    "IR": ["iran", "iranian", "tehran", "khamenei", "irgc", "rouhani", "raisi"],
+    "IL": ["israel", "israeli", "tel aviv", "jerusalem", "netanyahu", "idf", "gaza", "west bank"],
+    # Kept for general RSS detection (not target pairs)
     "EU": ["european union", "europe", "brussels", "ecb", "eurozone", "european commission"],
     "JP": ["japan", "japanese", "tokyo", "bank of japan"],
     "DE": ["germany", "german", "berlin", "bundesbank"],
     "GB": ["uk", "britain", "british", "london", "bank of england"],
     "SA": ["saudi arabia", "saudi", "riyadh", "aramco"],
     "BR": ["brazil", "brazilian", "brasilia"],
-    "BD": ["bangladesh", "dhaka"],
     "AU": ["australia", "australian", "canberra"],
 }
 
@@ -33,13 +36,15 @@ COUNTRY_NAMES = {
     "CN": "China",
     "US": "USA",
     "RU": "Russia",
+    "PK": "Pakistan",
+    "IR": "Iran",
+    "IL": "Israel",
     "EU": "EU",
     "JP": "Japan",
     "DE": "Germany",
     "GB": "UK",
     "SA": "Saudi Arabia",
     "BR": "Brazil",
-    "BD": "Bangladesh",
     "AU": "Australia",
 }
 

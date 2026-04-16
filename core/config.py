@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-# Country pairs (ISO2). Kept aligned with `nlp.corpus_pairs.CORPUS_TARGET_PAIRS` for the NLP track.
+# Country pairs (ISO2). Kept aligned with `nlp.corpus_pairs.CORPUS_TARGET_PAIRS`.
 SUBMISSION_PAIRS: list[tuple[str, str]] = [
-    ("IN", "CN"),
-    ("IN", "US"),
-    ("CN", "US"),
-    ("IN", "RU"),
+    ("IN", "CN"), ("IN", "US"), ("CN", "US"), ("IN", "RU"),
+    ("IN", "PK"), ("IN", "IR"), ("IN", "IL"),
+    ("CN", "RU"), ("CN", "IR"), ("CN", "PK"),
+    ("US", "RU"), ("US", "IR"), ("US", "IL"),
+    ("IL", "IR"), ("RU", "IR"),
 ]
 
 # Two-pillar composite (policy stance deferred — avoids neutral stance constant).
