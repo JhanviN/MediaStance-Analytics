@@ -201,49 +201,98 @@ def _parse_gdelt_zip(url: str) -> List[Dict]:
     return rows
 
 
-def _enrich_headlines(rows: List[Dict], limit: int = 500) -> List[Dict]:
+def _enrich_headlines(rows: List[Dict], limit: int = 500, save_path: Path = None, workers: int = 20) -> List[Dict]:
     """
-    Fetch actual article titles from source URLs using requests + basic parsing.
-    Only enriches rows where headline is a GDELT placeholder.
-    Skips on any error (best-effort).
+    Fetch actual article titles from source URLs.
+    Stratified by (pair, label) + parallel fetching with ThreadPoolExecutor.
+    20 workers = ~20x faster than sequential.
     """
+    import re
+    import html
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from collections import defaultdict
+
     try:
         from bs4 import BeautifulSoup
         has_bs4 = True
     except ImportError:
         has_bs4 = False
 
-    enriched = 0
+    # Group placeholders by (pair, label)
+    buckets: Dict[str, List[Dict]] = defaultdict(list)
     for row in rows:
-        if enriched >= limit:
-            break
-        if not row["url"].startswith("http"):
-            continue
-        if not row["headline"].startswith("[GDELT"):
-            continue
+        if row["headline"].startswith("[GDELT") and row["url"].startswith("http"):
+            key = f"{row['country_1']}-{row['country_2']}|{row['label']}"
+            buckets[key].append(row)
+
+    total_buckets = len(buckets)
+    if total_buckets == 0:
+        print("No placeholder rows to enrich.")
+        return rows
+
+    per_bucket = max(1, limit // total_buckets)
+    print(f"Enriching up to {per_bucket} rows per (pair,label) bucket across {total_buckets} buckets")
+    print(f"Using {workers} parallel workers — estimated time: {int(limit * 0.3 / workers / 60)} min")
+
+    # Build stratified selection: round-robin across buckets
+    ordered: List[Dict] = []
+    temp_counts: Dict[str, int] = defaultdict(int)
+    bucket_lists = list(buckets.values())
+    max_len = max(len(b) for b in bucket_lists)
+    for i in range(max_len):
+        for b in bucket_lists:
+            if i < len(b):
+                row = b[i]
+                key = f"{row['country_1']}-{row['country_2']}|{row['label']}"
+                if temp_counts[key] < per_bucket and len(ordered) < limit:
+                    ordered.append(row)
+                    temp_counts[key] += 1
+
+    print(f"Selected {len(ordered)} rows to enrich in parallel...")
+
+    def fetch_title(row: Dict):
         try:
-            r = requests.get(row["url"], timeout=5, headers={"User-Agent": "Mozilla/5.0"})
+            r = requests.get(
+                row["url"], timeout=5,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; TradePulse/1.0)"}
+            )
             if r.status_code != 200:
-                continue
+                return row, None
+            title = None
             if has_bs4:
                 soup = BeautifulSoup(r.text, "html.parser")
-                title = soup.find("title")
-                if title and title.text.strip():
-                    row["headline"] = title.text.strip()[:500]
-                    row["text"] = title.text.strip()[:4000]
-            else:
-                # Fallback: crude regex
-                import re
-                m = re.search(r"<title[^>]*>([^<]+)</title>", r.text, re.IGNORECASE)
+                tag = soup.find("title")
+                if tag and tag.text.strip():
+                    title = tag.text.strip()
+            if not title:
+                m = re.search(r"<title[^>]*>([^<]{5,})</title>", r.text, re.IGNORECASE)
                 if m:
-                    row["headline"] = m.group(1).strip()[:500]
-                    row["text"] = m.group(1).strip()[:4000]
-            enriched += 1
-            time.sleep(0.3)
+                    title = m.group(1).strip()
+            if title and len(title) > 10:
+                return row, html.unescape(title)[:500]
+            return row, None
         except Exception:
-            continue
+            return row, None
 
-    print(f"Enriched {enriched} headlines from source URLs.")
+    enriched_total = 0
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(fetch_title, row): row for row in ordered}
+        for future in as_completed(futures):
+            row, title = future.result()
+            if title:
+                row["headline"] = title
+                row["text"] = title
+                enriched_total += 1
+                if enriched_total % 200 == 0:
+                    print(f"  [{enriched_total}/{len(ordered)}] enriched so far...")
+                    if save_path:
+                        with open(save_path, "w", newline="", encoding="utf-8-sig") as f:
+                            writer = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
+                            writer.writeheader()
+                            for r2 in rows:
+                                writer.writerow({k: r2.get(k, "") for k in FIELDNAMES})
+
+    print(f"\nDone. Enriched {enriched_total} / {len(ordered)} rows.")
     return rows
 
 
@@ -253,10 +302,31 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=ROOT / "data" / "gdelt_raw.csv")
     ap.add_argument("--merge", action="store_true", help="Merge with existing file (keep old rows)")
     ap.add_argument("--enrich", action="store_true", help="Fetch actual article titles from URLs (slow)")
-    ap.add_argument("--enrich-limit", type=int, default=300, help="Max URLs to enrich (default 300)")
+    ap.add_argument("--enrich-only", action="store_true", help="Skip fetching new GDELT files — only enrich existing CSV")
+    ap.add_argument("--enrich-limit", type=int, default=13500, help="Max URLs to enrich, stratified across all (pair,label) buckets (default 13500)")
     ap.add_argument("--max-files", type=int, default=0, help="Limit number of GDELT files to process (0=all)")
     ap.add_argument("--probe", action="store_true", help="Test mode: process 3 files and print sample rows, don't write output")
     args = ap.parse_args()
+
+    # ── Enrich-only mode: skip all downloading, just enrich existing CSV ──────
+    if args.enrich_only:
+        if not args.out.exists():
+            print(f"[Error] {args.out} not found. Run without --enrich-only first.")
+            sys.exit(1)
+        print(f"Loading {args.out} for enrichment...")
+        with open(args.out, newline="", encoding="utf-8-sig") as f:
+            all_rows = list(csv.DictReader(f))
+        placeholder_count = sum(1 for r in all_rows if r.get("headline", "").startswith("[GDELT"))
+        print(f"Total rows: {len(all_rows)} | Placeholders to enrich: {placeholder_count}")
+        all_rows = _enrich_headlines(all_rows, limit=args.enrich_limit, save_path=args.out)
+        with open(args.out, "w", newline="", encoding="utf-8-sig") as f:
+            w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
+            w.writeheader()
+            for row in all_rows:
+                w.writerow({k: row.get(k, "") for k in FIELDNAMES})
+        enriched = sum(1 for r in all_rows if not r.get("headline", "").startswith("[GDELT"))
+        print(f"\nDone. {enriched} rows now have real headlines → {args.out}")
+        return
 
     urls = _gdelt_15min_urls(args.days)
     if not urls:
@@ -306,11 +376,9 @@ def main() -> None:
                 added += 1
         print(f"{added} new rows")
         new_count += added
-        time.sleep(0.1)  # be polite to GDELT servers
+        time.sleep(0.1)
 
     if args.enrich:
-        unenriched = [r for r in all_rows if r.get("headline", "").startswith("[GDELT")]
-        print(f"Enriching up to {args.enrich_limit} of {len(unenriched)} placeholder headlines...")
         all_rows = _enrich_headlines(all_rows, limit=args.enrich_limit)
 
     # Write output
@@ -323,7 +391,6 @@ def main() -> None:
 
     print(f"\nDone. {new_count} new rows added. Total: {len(all_rows)} rows → {args.out}")
 
-    # Summary
     from collections import Counter
     labels = [r.get("label", "") for r in all_rows if r.get("label")]
     pairs = [f"{r.get('country_1','')}-{r.get('country_2','')}" for r in all_rows]

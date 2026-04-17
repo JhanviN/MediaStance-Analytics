@@ -379,11 +379,23 @@ def main() -> None:
 
     for pair in target_pairs:
         for label in args.labels:
-            print(f"\n[{pair[0]}-{pair[1]}] {label.upper()}")
+            # Skip if this (pair, label) already has enough rows
+            pair_key = f"{pair[0]}-{pair[1]}"
+            existing_count = sum(
+                1 for r in all_rows
+                if f"{r.get('country_1','')}-{r.get('country_2','')}" == pair_key
+                and r.get("label") == label
+            )
+            if existing_count >= args.per_class:
+                print(f"\n[{pair[0]}-{pair[1]}] {label.upper()} — already have {existing_count} rows, skipping")
+                continue
+
+            remaining_needed = args.per_class - existing_count
+            print(f"\n[{pair[0]}-{pair[1]}] {label.upper()} — have {existing_count}, generating {remaining_needed} more")
             new_rows = generate_for_pair_label(
                 pair=pair,
                 label=label,
-                n=args.per_class,
+                n=remaining_needed,
                 backend=args.backend,
                 model=args.model,
                 batch_size=args.batch_size,
@@ -396,12 +408,38 @@ def main() -> None:
                     added += 1
             print(f"  → {added} unique rows added")
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, "w", newline="", encoding="utf-8-sig") as f:
-        w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
-        w.writeheader()
-        for row in all_rows:
-            w.writerow({k: row.get(k, "") for k in FIELDNAMES})
+            # Save after every (pair, label) — don't lose progress on crash
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            with open(args.out, "w", newline="", encoding="utf-8-sig") as f:
+                w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
+                w.writeheader()
+                for row in all_rows:
+                    w.writerow({k: row.get(k, "") for k in FIELDNAMES})
+            print(f"  ✓ Saved {len(all_rows)} total rows → {args.out.name}")
+            new_rows = generate_for_pair_label(
+                pair=pair,
+                label=label,
+                n=remaining_needed,
+                backend=args.backend,
+                model=args.model,
+                batch_size=args.batch_size,
+            )
+            added = 0
+            for row in new_rows:
+                if row["id"] not in seen_ids:
+                    seen_ids.add(row["id"])
+                    all_rows.append(row)
+                    added += 1
+            print(f"  → {added} unique rows added")
+
+            # Save after every (pair, label) — don't lose progress on crash
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            with open(args.out, "w", newline="", encoding="utf-8-sig") as f:
+                w = csv.DictWriter(f, fieldnames=FIELDNAMES, extrasaction="ignore")
+                w.writeheader()
+                for row in all_rows:
+                    w.writerow({k: row.get(k, "") for k in FIELDNAMES})
+            print(f"  ✓ Saved {len(all_rows)} total rows → {args.out.name}")
 
     from collections import Counter
     labels_dist = Counter(r.get("label", "") for r in all_rows if r.get("label"))
