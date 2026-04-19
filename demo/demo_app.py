@@ -66,8 +66,7 @@ conn = get_conn()
 total = conn.execute("SELECT COUNT(*) as c FROM predictions").fetchone()["c"]
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-st.sidebar.image("https://img.icons8.com/fluency/96/globe.png", width=60)
-st.sidebar.title("TradePulse")
+st.sidebar.title("🌐 TradePulse")
 st.sidebar.caption("Bilateral Geopolitical Sentiment")
 
 page = st.sidebar.radio(

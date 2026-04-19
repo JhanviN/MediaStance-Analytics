@@ -1,0 +1,10 @@
+HUMAN GOLD TEST SET — Honest Evaluation (no synthetic data)
+Total rows: 280
+
+Baseline:
+  Accuracy: 79.64%
+  Macro F1: 78.89%
+
+Transformer:
+  Accuracy: 78.93%
+  Macro F1: 78.03%
