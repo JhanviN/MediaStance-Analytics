@@ -254,7 +254,7 @@ def _enrich_headlines(rows: List[Dict], limit: int = 500, save_path: Path = None
         try:
             r = requests.get(
                 row["url"], timeout=5,
-                headers={"User-Agent": "Mozilla/5.0 (compatible; TradePulse/1.0)"}
+                headers={"User-Agent": "Mozilla/5.0 (compatible; MediaStance/1.0)"}
             )
             if r.status_code != 200:
                 return row, None

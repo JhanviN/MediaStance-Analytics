@@ -71,7 +71,7 @@ def plot_loss_curves(state: dict, out_dir: Path) -> None:
                 eval_f1.append(entry["eval_macro_f1"])
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("TradePulse — DistilBERT Training", fontsize=14, fontweight="bold")
+    fig.suptitle("MediaStance Analytics — DistilBERT Training", fontsize=14, fontweight="bold")
 
     # Loss curves
     ax = axes[0]
@@ -221,7 +221,7 @@ def write_summary(state: dict, pred_paths: dict, out_dir: Path) -> None:
 
     lines = [
         "=" * 60,
-        "TradePulse — Training Summary",
+        "MediaStance Analytics — Training Summary",
         "=" * 60,
         "",
     ]

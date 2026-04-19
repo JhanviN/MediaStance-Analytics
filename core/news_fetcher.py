@@ -126,7 +126,7 @@ def _stable_url(entry: dict, title: str, text: str) -> str:
     if link:
         return link
     h = hashlib.sha256(f"{title}|{text}".encode("utf-8")).hexdigest()[:24]
-    return f"urn:tradepulse:{h}"
+    return f"urn:mediastance:{h}"
 
 
 def fetch_articles(max_per_feed: int = 20, max_age_days: int | None = None) -> List[Dict]:

@@ -1,4 +1,4 @@
-# TradePulse — Bilateral economic news (NLP track)
+# MediaStance Analytics — Bilateral Geopolitical Sentiment (NLP)
 
 ## Primary: supervised NLP pipeline (current work)
 

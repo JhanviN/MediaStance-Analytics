@@ -1,1 +1,1 @@
-"""TradePulse core package."""
+"""MediaStance Analytics core package."""

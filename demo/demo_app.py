@@ -1,5 +1,5 @@
 """
-TradePulse — Streamlit Dashboard
+MediaStance Analytics — Streamlit Dashboard
 Run: streamlit run demo/demo_app.py
 """
 
@@ -25,8 +25,8 @@ from nlp.pair_utils import CANONICAL_PAIR_KEYS
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="TradePulse",
-    page_icon="🌐",
+    page_title="MediaStance Analytics",
+    page_icon="📡",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -66,7 +66,7 @@ conn = get_conn()
 total = conn.execute("SELECT COUNT(*) as c FROM predictions").fetchone()["c"]
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-st.sidebar.title("🌐 TradePulse")
+st.sidebar.title("📡 MediaStance Analytics")
 st.sidebar.caption("Bilateral Geopolitical Sentiment")
 
 page = st.sidebar.radio(
@@ -81,6 +81,13 @@ st.sidebar.markdown("---")
 st.sidebar.caption(f"Total predictions in DB: **{total:,}**")
 st.sidebar.caption(f"Model: **{model}**")
 
+# Auto-refresh every 5 minutes
+refresh = st.sidebar.toggle("Auto-refresh (5 min)", value=False)
+if refresh:
+    import time
+    time.sleep(300)
+    st.rerun()
+
 # ── Helper ────────────────────────────────────────────────────────────────────
 def pair_selector(key="pair", default="CN-US"):
     idx = all_pairs.index(default) if default in all_pairs else 0
@@ -91,7 +98,7 @@ def pair_selector(key="pair", default="CN-US"):
 # PAGE: Overview
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "🏠 Overview":
-    st.title("🌐 TradePulse — Geopolitical Sentiment Dashboard")
+    st.title("📡 MediaStance Analytics — Geopolitical Sentiment Dashboard")
     st.caption("Real-time bilateral relationship classification from news headlines")
 
     if total == 0:

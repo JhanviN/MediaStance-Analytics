@@ -27,7 +27,7 @@ from nlp.inference import combine_headline_body, predict_baseline, predict_trans
 from nlp.pair_utils import parse_pair, pair_key_from_codes
 from nlp.predictions_sqlite import connect, init_predictions_db, insert_prediction
 
-app = FastAPI(title="TradePulse Classify", version="1.0")
+app = FastAPI(title="MediaStance Analytics API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

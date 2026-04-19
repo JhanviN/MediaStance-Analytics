@@ -17,10 +17,22 @@ from .label_mapping import LABELS
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE_PATH = ROOT / "models" / "baseline_tfidf_lr.joblib"
 TRANSFORMER_DIR = ROOT / "models" / "transformer_bilateral"
+TEMPERATURE_PATH = TRANSFORMER_DIR / "temperature.json"
 
 _baseline = None
 _tokenizer = None
 _transformer = None
+_temperature: float = 1.0  # default — no scaling
+
+
+def _load_temperature() -> float:
+    """Load calibrated temperature if available, else return 1.0 (no scaling)."""
+    global _temperature
+    if TEMPERATURE_PATH.exists():
+        import json
+        data = json.loads(TEMPERATURE_PATH.read_text())
+        _temperature = float(data.get("temperature", 1.0))
+    return _temperature
 
 
 def combine_headline_body(headline: str, body: str | None = None, country_1: str = "", country_2: str = "") -> str:
@@ -69,6 +81,7 @@ def predict_baseline(text: str) -> Tuple[str, float, Dict[str, float]]:
 
 def predict_transformer(text: str, max_length: int = 256) -> Tuple[str, float, Dict[str, float]]:
     tokenizer, model = load_transformer()
+    T = _load_temperature()
     enc = tokenizer(
         text,
         return_tensors="pt",
@@ -78,7 +91,9 @@ def predict_transformer(text: str, max_length: int = 256) -> Tuple[str, float, D
     )
     with torch.no_grad():
         logits = model(**enc).logits
-    probs_t = torch.softmax(logits, dim=-1)[0]
+    # Apply temperature scaling — divides logits before softmax
+    calibrated_logits = logits / T
+    probs_t = torch.softmax(calibrated_logits, dim=-1)[0]
     probs = {LABELS[j]: float(probs_t[j]) for j in range(len(LABELS))}
     idx = int(torch.argmax(probs_t))
     return LABELS[idx], float(probs_t[idx]), probs
