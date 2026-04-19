@@ -1,5 +1,5 @@
 ============================================================
-TradePulse — Training Summary
+MediaStance Analytics — Training Summary
 ============================================================
 
 Total training steps:  1184
