@@ -379,6 +379,54 @@ elif page == "🔮 Live Predict":
             except ImportError:
                 st.json(probs)
 
+        # ── Historical context ────────────────────────────────────────────────
+        # Use transformer result if available, else baseline
+        primary_label = results.get("Transformer", results.get("Baseline", (None,)))[0]
+        if primary_label and pair_input:
+            st.markdown("---")
+            st.markdown(f"### 📚 Historical Context for {pair_input}")
+
+            # Overall distribution for this pair
+            dist = label_distribution(conn, pair_input, model="baseline")
+            total_hist = dist.get("total", 0)
+            if total_hist > 0:
+                pct = dist["percent"]
+                dominant = max(pct, key=pct.get)
+                dom_color = LABEL_COLORS[dominant]
+                adv_pct = pct.get("adversarial", 0)
+                coop_pct = pct.get("cooperative", 0)
+                neut_pct = pct.get("neutral", 0)
+
+                # Alignment message
+                if primary_label == dominant:
+                    alignment = f"✅ This prediction **aligns** with the historical pattern for {pair_input}."
+                else:
+                    alignment = f"⚠️ This prediction **differs** from the dominant historical pattern ({dominant}) for {pair_input}."
+
+                st.markdown(alignment)
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Total headlines", total_hist)
+                col2.metric("Adversarial", f"{adv_pct:.1f}%")
+                col3.metric("Cooperative", f"{coop_pct:.1f}%")
+                col4.metric("Neutral", f"{neut_pct:.1f}%")
+
+            # Recent headlines with same label
+            recent = list_headlines(
+                conn, pair_input, model="baseline",
+                label=primary_label, sort="date", limit=5
+            )
+            if recent:
+                st.markdown(f"**Recent {primary_label} headlines for {pair_input}:**")
+                for h in recent:
+                    color = LABEL_COLORS[primary_label]
+                    st.markdown(f"""
+                    <div style='border-left: 3px solid {color}; padding: 6px 10px; margin: 3px 0; background: #0e1117; border-radius: 3px; font-size:13px'>
+                        {h['headline'][:120]} <span style='color:#555; font-size:11px'>— {h['created_at'][:10]}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.caption(f"No historical {primary_label} headlines found for {pair_input} yet.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Attention Visualization

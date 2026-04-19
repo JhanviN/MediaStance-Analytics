@@ -13,18 +13,51 @@ The system covers 15 bilateral pairs across 7 countries: India (IN), China (CN),
 ## Architecture Overview
 
 ```
-RSS Feeds + GDELT + Synthetic Data
-            ↓
-    Data Pipeline (collect → label → merge)
-            ↓
-    NLP Models (TF-IDF baseline + DistilBERT)
-            ↓
-    Predictions Database (SQLite)
-            ↓
-    FastAPI Analytics Layer
-            ↓
-    Streamlit Dashboard + Live Pipeline
+┌─────────────────────────────────────────────────────┐
+│                  DATA SOURCES                        │
+│  RSS Feeds (live)  │  GDELT (historical)  │ Synthetic│
+└────────────────────┴──────────────────────┴──────────┘
+                          ↓
+┌─────────────────────────────────────────────────────┐
+│              DATA PIPELINE                           │
+│  collect → label → merge → split → train            │
+└─────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────┐
+│              NLP MODELS                              │
+│  TF-IDF + LR (baseline)  │  DistilBERT (advanced)   │
+└──────────────────────────┴──────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────┐
+│           PREDICTIONS DATABASE (SQLite)              │
+│  18,076 predictions │ 15 pairs │ 2 models            │
+└─────────────────────────────────────────────────────┘
+                          ↓
+          ┌───────────────┴───────────────┐
+          ↓                               ↓
+┌─────────────────┐             ┌─────────────────────┐
+│  FastAPI (REST) │             │ Streamlit Dashboard  │
+│  9 endpoints    │             │ 7 pages              │
+└─────────────────┘             └─────────────────────┘
+          ↑
+┌─────────────────────────────────────────────────────┐
+│           LIVE PIPELINE (APScheduler)                │
+│  RSS → predict → DB  (every 60 min, auto-scheduled) │
+└─────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Data Sources — How Each Is Used
+
+| Source | Purpose | Volume | Notes |
+|---|---|---|---|
+| RSS feeds | Live real-time headlines | ~50 articles/run | Used by live pipeline every 60 min |
+| GDELT | Historical labeled data for training | 9,013 enriched rows | Used once for DB seeding + training |
+| Synthetic (LM Studio) | Training data augmentation | 11,672 rows | Fills gaps in underrepresented pairs |
+| Human labels | Ground truth + gold test set | 280 rows | Never used for training, only evaluation |
+
+**Key distinction:** RSS is for live predictions. GDELT was used to build the historical baseline. They serve different purposes.
 
 ---
 
@@ -34,224 +67,203 @@ RSS Feeds + GDELT + Synthetic Data
 
 **Files:** `scripts/collect_corpus.py`, `core/news_fetcher.py`, `nlp/supplemental_feeds.py`
 
-- Fetches from 6 general RSS feeds (Reuters, BBC, Al Jazeera, Economic Times, PIB India)
+- 6 general RSS feeds (Reuters, BBC, Al Jazeera, Economic Times, PIB India)
 - 15 Google News search RSS feeds — one per bilateral pair
 - 90-day rolling window, configurable per run
-- Deduplication via Jaccard word overlap (catches near-duplicate headlines)
-- UTF-8 BOM output for Excel compatibility
+- Deduplication via Jaccard word overlap
 - `--merge` flag preserves existing rows across multiple runs
 
-**Output:** `data/raw_headlines.csv` with columns: id, headline, country_1, country_2, source, url, published_at, text
-
-### 2. GDELT Real-World Data
+### 2. GDELT Historical Data
 
 **File:** `scripts/fetch_gdelt.py`
 
 - Downloads GDELT 2.0 event files (15-minute intervals, public domain)
-- Maps CAMEO event codes to labels: codes 1-8 → cooperative, 9-11 → neutral, 12-20 → adversarial
-- Deduplicates by URL+pair, keeps dominant label per article
+- Maps CAMEO event codes → labels: 1-8 cooperative, 9-11 neutral, 12-20 adversarial
 - Parallel enrichment (20 workers) fetches real article titles from source URLs
-- Stratified enrichment: 300 rows per (pair, label) bucket — prevents dominant pairs from monopolizing
-- **Result:** 52,381 raw rows fetched, 9,013 enriched with real headlines
+- Stratified enrichment: equal rows per (pair, label) bucket
+- **Result:** 52,381 raw rows, 9,013 enriched with real headlines
+- **Used for:** seeding predictions.db with historical data + training data
 
-**CAMEO taxonomy:** 30-year political science standard developed at Harvard. Assigns structured event codes to news events globally.
+**CAMEO taxonomy:** 30-year political science standard. Assigns structured event codes to news events globally.
 
 ### 3. Synthetic Data Generation
 
 **File:** `scripts/generate_synthetic.py`
 
-- Supports LM Studio (local), OpenAI, and Gemini backends
-- Pair-specific prompts with domain context (e.g., IN-RU focuses on oil imports, S-400, sanctions)
-- Three label classes generated separately with tailored instructions
-- Incremental saving after every (pair, label) combo — crash-safe
-- Skip logic on restart: detects already-completed combos, resumes from where it left off
-- Deduplication by content hash
-- **Result:** 11,672 synthetic headlines across all 15 pairs, balanced labels
-
-**Why synthetic data is ethical:** Standard NLP practice (Stanford Alpaca, GPT fine-tuning datasets). Disclosed transparently. Evaluated separately on human-only gold test set.
+- Supports LM Studio (local), OpenAI, Gemini backends
+- Pair-specific prompts with domain context
+- Incremental saving — crash-safe, resumes on restart
+- **Result:** 11,672 synthetic headlines, all 15 pairs, balanced labels
+- **Used for:** filling training data gaps in India-centric pairs underrepresented in GDELT
 
 ### 4. Data Merging and Balancing
 
 **File:** `scripts/merge_augmented_data.py`
 
-Priority order:
-1. Human labels — always kept, never capped
-2. GDELT — capped at 50 per (pair, label) due to label noise
-3. Synthetic — fills remaining gaps
+Priority: Human labels (always kept) → GDELT (capped at 50/bucket, noisy) → Synthetic (fills gaps)
 
 **Result:** 13,925 merged rows, near-perfect label balance (33%/34%/33%)
 
 ### 5. NLP Models
 
-**Baseline — TF-IDF + Logistic Regression**
-- File: `scripts/train_baseline.py`
-- 30,000 features, bigrams, sublinear TF scaling
-- Balanced class weights
-- Fast, interpretable, strong baseline
+**Baseline — TF-IDF + Logistic Regression** (`scripts/train_baseline.py`)
+- 30,000 features, bigrams, sublinear TF, balanced class weights
 
-**Advanced — DistilBERT Fine-tuning**
-- File: `scripts/train_transformer.py`
+**Advanced — DistilBERT Fine-tuning** (`scripts/train_transformer.py`)
 - Pre-trained: `distilbert-base-uncased`
-- Entity-aware input: pair prepended to headline (`IN-CN: headline text`)
-- 5 epochs, batch size 32, fp16 on GPU
-- Early stopping via `load_best_model_at_end=True`
-- Optimized for macro F1, not accuracy
-- Trained on Google Colab T4 GPU (~18 minutes)
+- Entity-aware input: `IN-CN: headline text` — pair prepended so model knows which relationship to evaluate
+- 5 epochs, batch size 32, fp16, Colab T4 GPU (~18 min)
+- Optimized for macro F1
 
-**Entity-aware encoding:** The pair is injected into the model input so the same headline gets different representations for different pairs. "India and China hold talks" means something different for IN-CN vs IN-US queries.
+### 6. Confidence Calibration ✅
 
-### 6. Evaluation
+**File:** `scripts/calibrate_model.py`
+
+Temperature scaling (T=1.5276) applied after training:
+- ECE before: 0.0647 → ECE after: 0.0346 (46% improvement)
+- Mean confidence: 0.9432 → 0.8990 (more honest)
+- Saved to `models/transformer_bilateral/temperature.json`, auto-applied in inference
+- Makes `/alerts` confidence thresholds meaningful
+
+### 7. Evaluation
 
 **Files:** `scripts/evaluate.py`, `scripts/evaluate_human.py`, `scripts/plot_training.py`
 
 | Metric | Baseline | Transformer |
 |---|---|---|
-| Mixed test accuracy | 87.54% | 87.86% |
 | Mixed test macro F1 | 87.50% | 87.84% |
-| Human gold accuracy | 79.64% | 78.93% |
 | Human gold macro F1 | 78.89% | 78.03% |
 | AUC adversarial | 0.979 | 0.982 |
 | AUC cooperative | 0.977 | 0.981 |
 | AUC neutral | 0.964 | 0.968 |
 
 **Two test sets:**
-- Mixed (2,785 rows): 87% synthetic + 13% real — measures task learning
+- Mixed (2,785 rows): 87% synthetic — measures task learning
 - Human gold (280 rows): 100% human-labeled — honest real-world benchmark
 
-**Training plots generated:** loss curves, confusion matrices, per-class metrics, ROC curves, precision-recall curves
+**Plots:** loss curves, confusion matrices, per-class metrics, ROC curves, PR curves
 
-### 7. Error Analysis
+### 8. Error Analysis
 
-**File:** `scripts/error_analysis.py`, `results/error_analysis.md`
+338 misclassifications in 3 categories:
+1. **Genuine ambiguity (~40%)** — even humans disagree
+2. **Data noise (~30%)** — GDELT linked wrong article to pair
+3. **Soft signal detection (~30%)** — model misses indirect adversarial language ("deal still far off", "Strait remains closed")
 
-338 misclassifications categorized into three types:
-1. **Genuine ambiguity (~40%):** Even humans would disagree. Sanctions labeled neutral by human, adversarial by model — both defensible.
-2. **Data noise (~30%):** GDELT linked wrong article to a pair. Headline has no bilateral signal.
-3. **Soft signal detection (~30%):** Model misses subtle cooperative language ("first steps toward", "strengthening ties").
+### 9. Predictions Database
 
-### 8. Predictions Database
+SQLite with 18,076 predictions (9,064 baseline + 9,012 transformer). All analytics queries filter by `model=` — no double-counting.
 
-**File:** `nlp/predictions_sqlite.py`
-
-SQLite database with indexed queries:
-- `predictions` table: id, created_at, headline, text_used, country_1, country_2, model, label, confidence, p_adversarial, p_cooperative, p_neutral
-- Indices on: created_at, label, (country_1, country_2), model
-- **Current state:** 18,076 predictions (9,064 baseline + 9,012 transformer)
-
-### 9. FastAPI Serving Layer
+### 10. FastAPI Serving Layer
 
 **Files:** `api/main.py`, `api/routes_analytics.py`
 
-Endpoints:
-- `POST /classify` — single headline classification
+- `POST /classify` — single headline
 - `POST /classify/batch` — up to 50 headlines
-- `GET /summary?pair=IN-US` — label distribution for a pair
-- `GET /summary/all` — all 15 pairs at once
-- `GET /trends?pair=CN-US&rolling=7` — daily time series with rolling average
-- `GET /headlines?pair=IL-IR&label=adversarial` — browse predictions
-- `GET /alerts` — adversarial spike detection
-- `GET /compare?pair1=IN-US&pair2=CN-US` — side-by-side comparison
+- `GET /summary?pair=IN-US` — label distribution
+- `GET /summary/all` — all 15 pairs
+- `GET /trends?pair=CN-US&rolling=7` — time series
+- `GET /headlines?pair=IL-IR&label=adversarial` — browse
+- `GET /alerts` — spike detection
+- `GET /compare?pair1=IN-US&pair2=CN-US` — comparison
 - `GET /health` — health check
 
-Run: `uvicorn api.main:app --reload --host 127.0.0.1 --port 8000`
-Docs: `http://127.0.0.1:8000/docs`
+**APScheduler built-in:** API starts a background scheduler that runs the live pipeline every 60 minutes automatically. Works on any deployment — local, AWS, DigitalOcean, Railway.
 
-### 10. Streamlit Dashboard
+### 11. Streamlit Dashboard
 
-**File:** `demo/demo_app.py`
+**File:** `demo/demo_app.py` — 7 pages:
 
-6 pages:
-- **Overview:** All 15 pairs with color-coded adversarial/cooperative/neutral percentages + active alerts
-- **Trends:** Daily sentiment timeline with rolling average, distribution donut chart
-- **Alerts:** Configurable adversarial spike detection with severity levels
-- **Headlines:** Browse predictions by pair, label, date, confidence
-- **Compare Pairs:** Side-by-side bar chart comparison
-- **Live Predict:** Real-time classification of any headline
+| Page | What it shows |
+|---|---|
+| 🏠 Overview | All 15 pairs, color-coded sentiment, active alerts |
+| 📈 Trends | Daily timeline, rolling average, distribution donut |
+| 🔴 Alerts | Adversarial spike detection, configurable threshold |
+| 📰 Headlines | Browse by pair/label/date/confidence |
+| ⚖️ Compare Pairs | Side-by-side bar chart |
+| 🔮 Live Predict | Real-time classification of any headline |
+| 🧠 Attention | Token attention heatmap, top words per class |
 
-Run: `streamlit run demo/demo_app.py`
+### 12. Attention Visualization ✅
 
-### 11. Live Pipeline
+**File:** `scripts/attention_viz.py`
+
+- Extracts CLS token attention from all 6 DistilBERT layers, averaged across 12 heads
+- Live heatmap in dashboard — type any headline, see which tokens the model focuses on
+- Top words summary per class (adversarial/cooperative/neutral)
+- Demonstrates model learned correct semantic signals
+
+### 13. Live Pipeline
 
 **File:** `scripts/live_pipeline.py`
 
-Runs continuously:
-1. Fetches fresh headlines from all RSS feeds + Google News (last 24h)
-2. Runs through trained model
-3. Saves predictions to database
-4. Repeats every N minutes
+- Fetches fresh headlines from RSS + Google News (last 24h only)
+- Runs through trained model, saves to predictions.db
+- Runs every 60 minutes via APScheduler (embedded in FastAPI) or Windows Task Scheduler
+- `--once` flag for single run (useful for demos)
 
-Run: `python scripts/live_pipeline.py --model baseline --interval 60`
-Single run: `python scripts/live_pipeline.py --once`
+**Data source for live pipeline: RSS only** (not GDELT). RSS gives real-time headlines within minutes. GDELT has 15-minute delay + requires URL enrichment — not suitable for live use.
 
 ---
 
-## Data Flow Summary
+## Data Flow
 
 ```
-collect_corpus.py → raw_headlines.csv
-fetch_gdelt.py    → gdelt_raw.csv (enriched)
-generate_synthetic.py → synthetic_raw.csv
-        ↓
-merge_augmented_data.py → labeled_dataset_augmented.csv
-        ↓
-split_data.py → train.csv + test.csv
-        ↓
-train_baseline.py → models/baseline_tfidf_lr.joblib
-train_transformer.py → models/transformer_bilateral/
-        ↓
-predict_batch.py → predictions.db (18,076 rows)
-        ↓
-demo_app.py (dashboard) + api/main.py (REST API)
-        ↓
-live_pipeline.py (continuous updates)
+RSS + Google News → live_pipeline.py → predictions.db → dashboard/API
+GDELT (historical) → fetch_gdelt.py → gdelt_raw.csv → predict_batch.py → predictions.db
+Synthetic → generate_synthetic.py → synthetic_raw.csv ↘
+Human labels → labeled_dataset.csv                    → merge → train → models/
 ```
 
 ---
 
 ## Key Technical Decisions
 
-**Why entity-aware input?**
-Without it, the model sees the same headline regardless of which pair is being queried. "India and China hold talks" gets identical encoding for IN-CN and IN-US. Prepending the pair (`IN-CN: headline`) teaches the model which relationship to evaluate.
+**Entity-aware input:** Prepending `IN-CN:` to headlines teaches the model which relationship to evaluate. Same headline = different encoding for different pairs.
 
-**Why macro F1 over accuracy?**
-Accuracy rewards majority-class prediction. Macro F1 penalizes poor performance on any single class equally. For a 3-class balanced problem, macro F1 is the honest metric.
+**Macro F1 over accuracy:** Accuracy rewards majority-class prediction. Macro F1 penalizes poor performance on any class equally.
 
-**Why two test sets?**
-The mixed test set (87% synthetic) measures task learning. The human gold set (100% human-labeled) measures real-world generalization. Reporting only the mixed set would be misleading.
+**Two test sets:** Mixed set measures task learning. Human gold set measures real-world generalization. Both reported transparently.
 
-**Why GDELT at cap 50?**
-GDELT's CAMEO codes are assigned to events, not articles. One article can generate multiple events with conflicting codes. At ~40% label noise rate, capping at 50 per bucket limits noise contribution while preserving real-world text variety.
+**GDELT capped at 50/bucket:** ~40% label noise rate. Small contribution preserves text variety without corrupting training signal.
 
-**Why synthetic data?**
-GDELT underrepresents India-centric pairs (IN-PK, IN-IR, IN-CN) because English news volume for those pairs is lower than active conflict pairs (IR-US, IL-IR). Synthetic generation fills this gap with pair-specific, contextually accurate headlines.
+**Synthetic data:** GDELT underrepresents India-centric pairs. Synthetic fills gaps with pair-specific context. Standard NLP practice, disclosed transparently.
+
+**Temperature scaling:** Softmax overconfidence corrected. ECE improved 46%. Confidence scores now meaningful for alert thresholds.
 
 ---
 
-## What Is Left / Future Work
+## What Is Left
 
-### High Priority
-- **Confidence calibration:** ✅ DONE — Temperature scaling implemented (T=1.5276, ECE improved 46%). Saved to `models/transformer_bilateral/temperature.json`, auto-applied in inference.
-- **Inter-annotator agreement:** Get a second person to label 100 headlines independently. Measure Cohen's kappa. If kappa > 0.6, the task definition is validated.
-- **Daily scheduler:** ✅ DONE — `scripts/setup_scheduler.py` registers Windows Task Scheduler task. Runs `live_pipeline.py --once` every N minutes automatically. Logs to `logs/scheduler.log`.
+### Remaining
+- **Inter-annotator agreement:** Label 100 headlines with a second person, measure Cohen's kappa
+- **Causality graph:** Store CAMEO codes, trace event sequences that caused adversarial spikes
+- **Macro context panel:** Integrate geopolitical risk dataset (political stability, GDP, military expenditure)
+- **API authentication:** Rate limiting and API keys for public deployment
 
-### Medium Priority
-- **Attention visualization:** ✅ DONE — Live in dashboard (🧠 Attention page). Token heatmap, per-class probabilities, top words summary per class. Reveals model focuses on "tariffs/sanctions/retaliation" for adversarial and "agreement/deal/partnership" for cooperative.
-- **Causality graph:** GDELT stores event sequences. Tracing "what events caused this adversarial spike" is the next analytical layer. Requires storing CAMEO codes alongside labels.
-- **Macro context panel:** Integrate the geopolitical risk dataset (political stability index, GDP growth, military expenditure) as contextual features alongside NLP predictions.
-
-### Lower Priority
-- **API authentication:** Rate limiting and API keys for production deployment
-- **Model versioning:** Track model versions in the database so predictions are tied to the model that made them
-- **Confidence threshold filtering:** Only show predictions above a minimum confidence in the dashboard
+### Already Done
+- ✅ Data pipeline (RSS + GDELT + synthetic)
+- ✅ Two trained models (baseline + DistilBERT)
+- ✅ Entity-aware input encoding
+- ✅ Confidence calibration (temperature scaling)
+- ✅ Full evaluation (mixed + human gold, ROC, PR curves)
+- ✅ Error analysis
+- ✅ FastAPI with 9 endpoints
+- ✅ SQLite predictions database (18,076 rows)
+- ✅ Streamlit dashboard (7 pages)
+- ✅ Attention visualization (live in dashboard)
+- ✅ Live pipeline (RSS → predict → DB)
+- ✅ APScheduler (auto-runs in API process, deployment-ready)
+- ✅ Windows Task Scheduler setup script
 
 ---
 
 ## Project Stats
 
-| Item | Count |
+| Item | Value |
 |---|---|
-| Country pairs | 15 |
 | Countries | 7 |
+| Bilateral pairs | 15 |
 | Training rows | 11,140 |
 | Test rows | 2,785 |
 | Human gold test rows | 280 |
@@ -259,29 +271,29 @@ GDELT underrepresents India-centric pairs (IN-PK, IN-IR, IN-CN) because English 
 | Transformer macro F1 (mixed) | 87.84% |
 | Transformer macro F1 (human gold) | 78.03% |
 | AUC range | 0.964 – 0.982 |
+| Calibration ECE improvement | 46% |
 | API endpoints | 9 |
-| Dashboard pages | 6 |
+| Dashboard pages | 7 |
 
 ---
 
 ## How to Run
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
 
-# Collect fresh data
-python scripts/collect_corpus.py --feeds 50 --merge
-
-# Start live pipeline (continuous)
-python scripts/live_pipeline.py --model baseline --interval 60
-
-# Start dashboard
+# Dashboard
 streamlit run demo/demo_app.py
 
-# Start API
+# API (with auto-scheduler)
 uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 
-# Classify a headline
+# Live pipeline (manual)
+python scripts/live_pipeline.py --model baseline --interval 60
+
+# Single prediction
 python scripts/predict.py -t "India and China sign trade deal" --pair IN-CN
+
+# Setup Windows auto-scheduler
+python scripts/setup_scheduler.py --interval 60
 ```
