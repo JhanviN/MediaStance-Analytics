@@ -230,12 +230,12 @@ GDELT underrepresents India-centric pairs (IN-PK, IN-IR, IN-CN) because English 
 ## What Is Left / Future Work
 
 ### High Priority
-- **Confidence calibration:** Softmax probabilities are not calibrated. Temperature scaling after training would make confidence scores meaningful for the `/alerts` threshold logic.
+- **Confidence calibration:** ✅ DONE — Temperature scaling implemented (T=1.5276, ECE improved 46%). Saved to `models/transformer_bilateral/temperature.json`, auto-applied in inference.
 - **Inter-annotator agreement:** Get a second person to label 100 headlines independently. Measure Cohen's kappa. If kappa > 0.6, the task definition is validated.
 - **Daily scheduler:** Automate `live_pipeline.py` via cron job or Windows Task Scheduler for truly autonomous operation.
 
 ### Medium Priority
-- **Attention visualization:** Extract DistilBERT attention weights to show which words drive adversarial/cooperative classification. Strong presentation material.
+- **Attention visualization:** ✅ DONE — Live in dashboard (🧠 Attention page). Token heatmap, per-class probabilities, top words summary per class. Reveals model focuses on "tariffs/sanctions/retaliation" for adversarial and "agreement/deal/partnership" for cooperative.
 - **Causality graph:** GDELT stores event sequences. Tracing "what events caused this adversarial spike" is the next analytical layer. Requires storing CAMEO codes alongside labels.
 - **Macro context panel:** Integrate the geopolitical risk dataset (political stability index, GDP growth, military expenditure) as contextual features alongside NLP predictions.
 
