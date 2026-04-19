@@ -413,8 +413,14 @@ elif page == "🔮 Live Predict":
             # Recent headlines with same label
             recent = list_headlines(
                 conn, pair_input, model="baseline",
-                label=primary_label, sort="date", limit=5
+                label=primary_label, sort="confidence", limit=20
             )
+            # Keep only high-confidence predictions — these are most likely genuinely bilateral
+            recent = [
+                h for h in recent
+                if h["confidence"] >= 0.75
+                and not h["headline"].startswith("[GDELT")
+            ][:5]
             if recent:
                 st.markdown(f"**Recent {primary_label} headlines for {pair_input}:**")
                 for h in recent:
