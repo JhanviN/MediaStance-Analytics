@@ -36,7 +36,17 @@ MODEL_NAME = "distilbert-base-uncased"
 
 
 def _text(row: dict) -> str:
-    return (row.get("text") or row.get("headline") or "").strip()
+    """Build entity-aware input: prepend the bilateral pair to the headline.
+    
+    Format: "IN-CN: India and China hold trade talks"
+    This tells the model WHICH relationship to classify, not just the text.
+    """
+    c1 = (row.get("country_1") or "").strip().upper()
+    c2 = (row.get("country_2") or "").strip().upper()
+    text = (row.get("text") or row.get("headline") or "").strip()
+    if c1 and c2:
+        return f"{c1}-{c2}: {text}"
+    return text
 
 
 def _load(path: Path) -> list[dict]:
@@ -123,7 +133,10 @@ def main() -> None:
     def compute_metrics(eval_pred):
         logits, labels = eval_pred
         preds = np.argmax(logits, axis=-1)
-        return {"accuracy": float(accuracy_score(labels, preds))}
+        from sklearn.metrics import f1_score
+        acc = float(accuracy_score(labels, preds))
+        f1 = float(f1_score(labels, preds, average="macro"))
+        return {"accuracy": acc, "macro_f1": f1}
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     targs = TrainingArguments(
@@ -136,7 +149,7 @@ def main() -> None:
         evaluation_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
-        metric_for_best_model="accuracy",
+        metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=20,
         report_to=[],

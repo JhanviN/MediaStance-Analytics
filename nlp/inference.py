@@ -23,12 +23,18 @@ _tokenizer = None
 _transformer = None
 
 
-def combine_headline_body(headline: str, body: str | None = None) -> str:
+def combine_headline_body(headline: str, body: str | None = None, country_1: str = "", country_2: str = "") -> str:
     h = (headline or "").strip()
     b = (body or "").strip()
+    # Entity-aware: prepend pair if available
+    pair_prefix = ""
+    c1 = (country_1 or "").strip().upper()
+    c2 = (country_2 or "").strip().upper()
+    if c1 and c2:
+        pair_prefix = f"{c1}-{c2}: "
     if b and b != h:
-        return f"{h}. {b}"[:8000]
-    return h
+        return f"{pair_prefix}{h}. {b}"[:8000]
+    return f"{pair_prefix}{h}"
 
 
 def load_baseline():
