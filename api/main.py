@@ -2,7 +2,7 @@
 FastAPI: POST /classify
 
 Run from repo root:
-  pip install fastapi uvicorn
+  pip install fastapi uvicorn apscheduler
   uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
 
 Docs: http://127.0.0.1:8000/docs
@@ -10,7 +10,10 @@ Docs: http://127.0.0.1:8000/docs
 
 from __future__ import annotations
 
+import logging
+import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, Literal, Optional
 
@@ -27,7 +30,57 @@ from nlp.inference import combine_headline_body, predict_baseline, predict_trans
 from nlp.pair_utils import parse_pair, pair_key_from_codes
 from nlp.predictions_sqlite import connect, init_predictions_db, insert_prediction
 
-app = FastAPI(title="MediaStance Analytics API", version="1.0")
+logger = logging.getLogger("mediastance")
+
+# ── Background scheduler ──────────────────────────────────────────────────────
+def _run_live_pipeline() -> None:
+    """Called by scheduler every N minutes — collect fresh headlines and predict."""
+    try:
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from live_pipeline import run_once
+        db_conn = connect(ROOT / "data" / "predictions.db")
+        init_predictions_db(db_conn)
+        added = run_once(db_conn, model="baseline")
+        db_conn.close()
+        logger.info(f"Scheduled pipeline run: {added} new predictions added")
+    except Exception as e:
+        logger.error(f"Scheduled pipeline error: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start background scheduler on startup, stop on shutdown."""
+    interval = int(os.environ.get("PIPELINE_INTERVAL_MINUTES", "60"))
+    scheduler = None
+
+    if interval > 0:
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            scheduler = BackgroundScheduler()
+            scheduler.add_job(
+                _run_live_pipeline,
+                "interval",
+                minutes=interval,
+                id="live_pipeline",
+                replace_existing=True,
+            )
+            scheduler.start()
+            logger.info(f"Live pipeline scheduler started — runs every {interval} min")
+        except ImportError:
+            logger.warning("apscheduler not installed — scheduler disabled. Run: pip install apscheduler")
+
+    yield  # app runs here
+
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("Scheduler stopped")
+
+
+app = FastAPI(
+    title="MediaStance Analytics API",
+    version="1.0",
+    lifespan=lifespan,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

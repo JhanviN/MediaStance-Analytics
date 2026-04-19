@@ -232,7 +232,7 @@ GDELT underrepresents India-centric pairs (IN-PK, IN-IR, IN-CN) because English 
 ### High Priority
 - **Confidence calibration:** ✅ DONE — Temperature scaling implemented (T=1.5276, ECE improved 46%). Saved to `models/transformer_bilateral/temperature.json`, auto-applied in inference.
 - **Inter-annotator agreement:** Get a second person to label 100 headlines independently. Measure Cohen's kappa. If kappa > 0.6, the task definition is validated.
-- **Daily scheduler:** Automate `live_pipeline.py` via cron job or Windows Task Scheduler for truly autonomous operation.
+- **Daily scheduler:** ✅ DONE — `scripts/setup_scheduler.py` registers Windows Task Scheduler task. Runs `live_pipeline.py --once` every N minutes automatically. Logs to `logs/scheduler.log`.
 
 ### Medium Priority
 - **Attention visualization:** ✅ DONE — Live in dashboard (🧠 Attention page). Token heatmap, per-class probabilities, top words summary per class. Reveals model focuses on "tariffs/sanctions/retaliation" for adversarial and "agreement/deal/partnership" for cooperative.
