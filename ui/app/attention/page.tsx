@@ -14,23 +14,32 @@ interface AttentionResponse {
 }
 
 function TokenHeatmap({ tokens, weights }: { tokens: string[]; weights: number[] }) {
-  const max = Math.max(...weights, 0.001);
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, lineHeight: 2 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, lineHeight: 2.2 }}>
       {tokens.map((tok, i) => {
-        const norm = weights[i] / max;
+        const w = weights[i] ?? 0;
+        // Use a stepped color scale for better visibility
+        const bg = w > 0.75
+          ? `rgba(224, 92, 92, 0.85)`
+          : w > 0.5
+          ? `rgba(224, 92, 92, 0.55)`
+          : w > 0.25
+          ? `rgba(224, 92, 92, 0.25)`
+          : `rgba(224, 92, 92, 0.06)`;
+        const textColor = w > 0.6 ? "#fff" : "var(--text)";
         return (
           <span
             key={i}
-            title={`weight: ${weights[i].toFixed(4)}`}
+            title={`weight: ${w.toFixed(3)}`}
             style={{
-              padding: "2px 6px",
-              borderRadius: 4,
-              background: `rgba(226, 75, 74, ${norm * 0.85})`,
-              color: norm > 0.5 ? "#fff" : "var(--text)",
+              padding: "3px 8px",
+              borderRadius: 5,
+              background: bg,
+              color: textColor,
               fontSize: 14,
               fontFamily: "monospace",
               cursor: "default",
+              border: `1px solid rgba(224, 92, 92, ${w * 0.4 + 0.05})`,
               transition: "background 0.2s",
             }}
           >
@@ -89,7 +98,7 @@ export default function AttentionPage() {
           rows={3}
           style={{
             width: "100%",
-            background: "var(--surface)",
+            background: "#f9fafb",
             border: "1px solid var(--border)",
             borderRadius: 8,
             color: "var(--text)",
@@ -112,7 +121,7 @@ export default function AttentionPage() {
             type="submit"
             disabled={loading || !text.trim()}
             style={{
-              background: loading ? "#2a2f3d" : ADV_COLOR,
+              background: loading ? "#e2e6ef" : ADV_COLOR,
               color: "#fff",
               border: "none",
               borderRadius: 6,

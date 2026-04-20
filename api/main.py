@@ -26,7 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from api.routes_analytics import router as analytics_router
-from nlp.inference import combine_headline_body, predict_baseline, predict_transformer
+from nlp.inference import combine_headline_body, predict_baseline, predict_transformer, get_attention_weights
 from nlp.pair_utils import parse_pair, pair_key_from_codes
 from nlp.predictions_sqlite import connect, init_predictions_db, insert_prediction
 
@@ -127,6 +127,30 @@ class BatchClassifyItem(BaseModel):
 class BatchClassifyRequest(BaseModel):
     items: list[BatchClassifyItem]
     model: Literal["baseline", "transformer", "both"] = "both"
+
+
+class AttentionRequest(BaseModel):
+    text: str = Field(..., description="Headline or text to visualize")
+    pair: Optional[str] = Field(None, description="Bilateral pair e.g. IN-US")
+
+
+class AttentionResponse(BaseModel):
+    tokens: list[str]
+    weights: list[float]
+    label: str
+    confidence: float
+
+
+@app.post("/attention", response_model=AttentionResponse)
+def attention(req: AttentionRequest):
+    t = req.text.strip()
+    if not t:
+        raise HTTPException(400, "text is required")
+    try:
+        tokens, weights, label, confidence = get_attention_weights(t)
+        return AttentionResponse(tokens=tokens, weights=weights, label=label, confidence=confidence)
+    except FileNotFoundError as e:
+        raise HTTPException(503, str(e)) from e
 
 
 @app.get("/health")

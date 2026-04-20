@@ -77,8 +77,8 @@ export default function OverviewPage() {
       {alerts.length > 0 ? (
         <div
           style={{
-            background: "#2d1010",
-            border: "1px solid #7f1d1d",
+            background: "#fff5f5",
+            border: "1px solid #fecaca",
             borderRadius: 6,
             padding: "10px 16px",
             marginBottom: 20,
@@ -87,7 +87,7 @@ export default function OverviewPage() {
             justifyContent: "space-between",
           }}
         >
-          <span style={{ color: "#fca5a5", fontSize: 13 }}>
+          <span style={{ color: "#b91c1c", fontSize: 13 }}>
             {alerts.length} active alert{alerts.length > 1 ? "s" : ""} —{" "}
             {alerts.map((a) => a.pair).join(", ")}
           </span>
@@ -101,12 +101,12 @@ export default function OverviewPage() {
       ) : (
         <div
           style={{
-            background: "#0d1f0d",
-            border: "1px solid #14532d",
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
             borderRadius: 6,
             padding: "8px 16px",
             marginBottom: 20,
-            color: "#86efac",
+            color: "#15803d",
             fontSize: 13,
           }}
         >
@@ -167,11 +167,13 @@ export default function OverviewPage() {
                   transition: "border-color 0.15s",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = "#4a5568";
+                  (e.currentTarget as HTMLDivElement).style.borderColor = "#c7cdd9";
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLDivElement).style.borderColor =
                     alertPairs.has(p.pair) ? ADV_COLOR : "var(--border)";
+                  (e.currentTarget as HTMLDivElement).style.boxShadow = "none";
                 }}
               >
                 <div className="mono" style={{ fontWeight: 500, fontSize: 15, marginBottom: 10 }}>

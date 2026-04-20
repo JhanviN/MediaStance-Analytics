@@ -2,11 +2,11 @@ export default function ErrorBanner({ message }: { message: string }) {
   return (
     <div
       style={{
-        background: "#2d1f0a",
-        border: "1px solid #92400e",
+        background: "#fffbeb",
+        border: "1px solid #fcd34d",
         borderRadius: 6,
         padding: "10px 16px",
-        color: "#fbbf24",
+        color: "#92400e",
         fontSize: 13,
         marginBottom: 20,
       }}

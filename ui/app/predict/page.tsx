@@ -12,7 +12,7 @@ function ProbBar({ label, value }: { label: string; value: number }) {
         <span style={{ color: "var(--muted)" }}>{label}</span>
         <span className="mono" style={{ color: LABEL_COLORS[label] }}>{(value * 100).toFixed(1)}%</span>
       </div>
-      <div style={{ height: 6, background: "#2a2f3d", borderRadius: 3, overflow: "hidden" }}>
+      <div style={{ height: 6, background: "#eef0f5", borderRadius: 3, overflow: "hidden" }}>
         <div
           style={{
             height: "100%",
@@ -94,7 +94,7 @@ export default function PredictPage() {
           rows={4}
           style={{
             width: "100%",
-            background: "var(--surface)",
+            background: "#f9fafb",
             border: "1px solid var(--border)",
             borderRadius: 8,
             color: "var(--text)",
@@ -126,7 +126,7 @@ export default function PredictPage() {
             type="submit"
             disabled={loading || !text.trim()}
             style={{
-              background: loading ? "#2a2f3d" : ADV_COLOR,
+              background: loading ? "#e2e6ef" : ADV_COLOR,
               color: "#fff",
               border: "none",
               borderRadius: 6,

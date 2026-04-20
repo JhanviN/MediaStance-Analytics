@@ -35,17 +35,17 @@ export interface AlertsResponse {
 
 export interface TrendPoint {
   date: string;
-  adversarial: number;
+  adversarial: number;  // fraction 0-1
   cooperative: number;
   neutral: number;
-  total: number;
+  n: number;
 }
 
 export interface TrendsResponse {
   pair: string;
   model: string;
   series: TrendPoint[];
-  rolling_adversarial?: { date: string; value: number }[];
+  rolling_adversarial?: { date: string; adversarial_rolling_avg: number; n_points: number }[];
 }
 
 export interface HeadlineItem {

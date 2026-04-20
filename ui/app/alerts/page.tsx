@@ -45,11 +45,11 @@ export default function AlertsPage() {
       ) : alerts.length === 0 ? (
         <div
           style={{
-            background: "#0d1f0d",
-            border: "1px solid #14532d",
+            background: "#f0fdf4",
+            border: "1px solid #bbf7d0",
             borderRadius: 8,
             padding: "20px 24px",
-            color: "#86efac",
+            color: "#15803d",
           }}
         >
           ✓ No active alerts for {model} model

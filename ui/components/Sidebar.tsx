@@ -21,7 +21,7 @@ export default function Sidebar() {
       style={{
         width: "var(--sidebar-w)",
         minWidth: "var(--sidebar-w)",
-        background: "var(--surface)",
+        background: "#ffffff",
         borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
@@ -29,6 +29,7 @@ export default function Sidebar() {
         position: "sticky",
         top: 0,
         height: "100vh",
+        boxShadow: "1px 0 0 var(--border)",
       }}
     >
       {/* Logo */}
@@ -49,10 +50,11 @@ export default function Sidebar() {
               style={{
                 display: "block",
                 padding: "8px 20px",
-                color: active ? "#f1f5f9" : "var(--muted)",
+                color: active ? "#1e2330" : "var(--muted)",
                 textDecoration: "none",
                 fontWeight: active ? 500 : 400,
                 borderLeft: active ? "3px solid var(--adv)" : "3px solid transparent",
+                background: active ? "#fef2f2" : "transparent",
                 transition: "color 0.15s",
               }}
             >
@@ -72,7 +74,7 @@ export default function Sidebar() {
           lineHeight: 1.6,
         }}
       >
-        <div className="mono" style={{ color: "#94a3b8" }}>human gold F1: 78%</div>
+        <div className="mono" style={{ color: "var(--muted)" }}>human gold F1: 78%</div>
         <div style={{ marginTop: 2 }}>mixed score: 87%</div>
       </div>
     </nav>
