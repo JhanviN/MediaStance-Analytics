@@ -150,3 +150,8 @@ scripts/                Training, evaluation, data pipeline scripts
 
 - `PROJECT_DOC.md` — complete implementation documentation
 - `RESEARCH_REPORT.md` — NLP research report with methodology and results
+  
+
+Author  
+Jhanvi Nagori  
+Fullstack Developer
