@@ -63,13 +63,13 @@ FastAPI (9 endpoints) + Streamlit Dashboard (7 pages)
 
 | Page | Description |
 |---|---|
-| 🏠 Overview | All 15 pairs, color-coded sentiment, active alerts |
-| 📈 Trends | Daily timeline with rolling average |
-| 🔴 Alerts | Adversarial spike detection |
-| 📰 Headlines | Browse by pair, label, confidence |
-| ⚖️ Compare Pairs | Side-by-side comparison |
-| 🔮 Live Predict | Classify any headline + historical context |
-| 🧠 Attention | Token attention heatmap (model interpretability) |
+|  Overview | All 15 pairs, color-coded sentiment, active alerts |
+|  Trends | Daily timeline with rolling average |
+|  Alerts | Adversarial spike detection |
+|  Headlines | Browse by pair, label, confidence |
+|  Compare Pairs | Side-by-side comparison |
+|  Live Predict | Classify any headline + historical context |
+|  Attention | Token attention heatmap (model interpretability) |
 
 ---
 
