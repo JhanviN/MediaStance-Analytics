@@ -1,0 +1,15 @@
+export const ADV_COLOR = "#E24B4A";
+export const COOP_COLOR = "#639922";
+export const NEUT_COLOR = "#378ADD";
+
+export const LABEL_COLORS: Record<string, string> = {
+  adversarial: ADV_COLOR,
+  cooperative: COOP_COLOR,
+  neutral: NEUT_COLOR,
+};
+
+export const ALL_PAIRS = [
+  "CN-IN", "IN-US", "CN-US", "IN-RU", "IN-PK",
+  "IN-IR", "IL-IN", "CN-RU", "CN-IR", "CN-PK",
+  "RU-US", "IR-US", "IL-US", "IL-IR", "IR-RU",
+];
