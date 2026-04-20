@@ -152,6 +152,7 @@ scripts/                Training, evaluation, data pipeline scripts
 - `RESEARCH_REPORT.md` — NLP research report with methodology and results
   
 
-Author  
-Jhanvi Nagori  
-Fullstack Developer
+### Author
+
+Jhanvi N  
+Full-stack Developer | Passionate about building interactive and efficient web applications.
