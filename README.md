@@ -1,3 +1,15 @@
+---
+title: MediaStance Analytics
+emoji: 📡
+colorFrom: red
+colorTo: blue
+sdk: streamlit
+sdk_version: 1.33.0
+app_file: demo/demo_app.py
+pinned: true
+license: mit
+---
+
 # MediaStance Analytics
 
 **Real-time bilateral geopolitical sentiment classification from news headlines.**
