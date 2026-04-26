@@ -1,13 +1,42 @@
+# Environment
 .env
-data/tradepulse.db
-data/predictions.db
-reports/
-__pycache__/
-*.pyc
-.pytest_cache/
 .venv/
 venv/
-models/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Large training artifacts — exclude from git
+data/gdelt_raw.csv
+data/gdelt_4months.csv
+data/synthetic_raw.csv
+data/raw_headlines*.csv
+data/train.csv
+data/test.csv
+data/labeled_dataset_augmented.csv
+
+# Model training checkpoints (keep final model, exclude checkpoints)
+models/transformer_bilateral/checkpoint-*/
+models/transformer_bilateral/optimizer.pt
+models/transformer_bilateral/rng_state.pth
+models/transformer_bilateral/scheduler.pt
+
+# Large binary model files — upload separately to HF Hub
 *.safetensors
 *.pt
 *.bin
+
+# Legacy
+data/tradepulse.db
+reports/
+{core,data,demo}/
+
+# Logs
+logs/
+*.log
+
+# Temp scripts
+scripts/_*.py

@@ -1,0 +1,17 @@
+# HuggingFace Spaces requirements
+# Pinned for reproducibility on HF CPU/GPU instances
+
+transformers==4.44.2
+torch==2.2.0
+feedparser==6.0.11
+streamlit==1.33.0
+requests==2.31.0
+scikit-learn==1.4.2
+joblib==1.4.0
+fastapi==0.110.0
+uvicorn==0.27.0
+beautifulsoup4==4.12.3
+plotly==5.20.0
+apscheduler==3.10.4
+accelerate==0.33.0
+numpy==1.26.4

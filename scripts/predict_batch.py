@@ -19,6 +19,7 @@ if str(ROOT) not in sys.path:
 
 from nlp.inference import predict_baseline, predict_transformer, combine_headline_body
 from nlp.predictions_sqlite import connect, init_predictions_db, insert_prediction
+from nlp.cameo_codes import get_description, normalize_code
 
 VALID_LABELS = frozenset({"adversarial", "cooperative", "neutral"})
 
@@ -69,6 +70,22 @@ def main() -> None:
         # Entity-aware input — same as training
         input_text = f"{c1}-{c2}: {text}" if c1 and c2 else text
 
+        # Extract CAMEO code from source column (format: "GDELT-13")
+        source = row.get("source", "")
+        cameo_code = None
+        cameo_desc = None
+        if source.startswith("GDELT-"):
+            raw_code = source.replace("GDELT-", "").strip()
+            try:
+                cameo_code = normalize_code(raw_code)
+                cameo_desc = get_description(raw_code)
+            except Exception:
+                pass
+
+        # Use published_at from source CSV as the prediction timestamp
+        # This preserves the original article date for trend analysis
+        published_at = (row.get("published_at") or "").strip() or None
+
         try:
             if args.model in ("baseline", "both"):
                 lab, conf, probs = predict_baseline(input_text)
@@ -82,6 +99,9 @@ def main() -> None:
                     label=lab,
                     confidence=conf,
                     probs=probs,
+                    cameo_code=cameo_code,
+                    cameo_description=cameo_desc,
+                    created_at=published_at,
                 )
 
             if args.model in ("transformer", "both"):
@@ -96,6 +116,9 @@ def main() -> None:
                     label=lab,
                     confidence=conf,
                     probs=probs,
+                    cameo_code=cameo_code,
+                    cameo_description=cameo_desc,
+                    created_at=published_at,
                 )
 
             processed += 1

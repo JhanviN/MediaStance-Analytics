@@ -79,6 +79,7 @@ def trends_by_day(
     model: str = DEFAULT_MODEL,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    min_confidence: float = 0.0,
 ) -> List[Dict[str, Any]]:
     a, b = parse_pair(pair)
     sql = (
@@ -92,6 +93,9 @@ def trends_by_day(
     if end_date:
         sql += " AND substr(created_at, 1, 10) <= ?"
         cond.append(end_date[:10])
+    if min_confidence > 0:
+        sql += " AND confidence >= ?"
+        cond.append(min_confidence)
     sql += " GROUP BY d, label ORDER BY d"
     rows = conn.execute(sql, cond).fetchall()
     by_day: Dict[str, Dict[str, int]] = defaultdict(lambda: {lab: 0 for lab in LABELS})

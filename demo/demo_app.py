@@ -17,6 +17,22 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# On HuggingFace Spaces, download model from Hub if not present locally
+_MODEL_DIR = ROOT / "models" / "transformer_bilateral"
+if not _MODEL_DIR.exists() or not (_MODEL_DIR / "model.safetensors").exists():
+    import os
+    _hf_repo = os.environ.get("HF_MODEL_REPO", "JhanviN/mediastance-deploy")
+    if _hf_repo:
+        try:
+            from huggingface_hub import snapshot_download
+            snapshot_download(
+                repo_id=_hf_repo,
+                local_dir=str(_MODEL_DIR),
+                token=os.environ.get("HF_TOKEN"),
+            )
+        except Exception as e:
+            st.warning(f"Could not load transformer model: {e}. Baseline model only.")
+
 from nlp.predictions_sqlite import connect, init_predictions_db
 from nlp.analytics_queries import (
     label_distribution, summary_all_pairs, trends_by_day,
@@ -72,7 +88,7 @@ st.sidebar.caption("Bilateral Geopolitical Sentiment")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["🏠 Overview", "📈 Trends", "🔴 Alerts", "📰 Headlines", "⚖️ Compare Pairs", "🔮 Live Predict", "🧠 Attention"]
+    ["Overview", "Trends", "Alerts", "Headlines", "Compare Pairs", "Live Predict", "Attention", "Causality"]
 )
 
 model = st.sidebar.selectbox("Model", ["baseline", "transformer"], index=0)
@@ -98,7 +114,7 @@ def pair_selector(key="pair", default="CN-US"):
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Overview
 # ══════════════════════════════════════════════════════════════════════════════
-if page == "🏠 Overview":
+if page == "Overview":
     st.title("📡 MediaStance Analytics — Geopolitical Sentiment Dashboard")
     st.caption("Real-time bilateral relationship classification from news headlines")
 
@@ -137,7 +153,7 @@ if page == "🏠 Overview":
 
     # Alerts
     st.markdown("---")
-    st.markdown("### 🚨 Active Alerts")
+    st.markdown("### Active Alerts")
     alerts = detect_spikes(conn, model=model, threshold_pp=15.0, days=7)
     if not alerts:
         st.success("No adversarial spikes detected in the last 7 days.")
@@ -156,8 +172,8 @@ if page == "🏠 Overview":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Trends
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📈 Trends":
-    st.title("📈 Sentiment Trends")
+elif page == "Trends":
+    st.title("Sentiment Trends")
 
     try:
         import plotly.graph_objects as go
@@ -170,7 +186,15 @@ elif page == "📈 Trends":
     pair = pair_selector("trends_pair", "CN-US")
     rolling_window = st.slider("Rolling average window (days)", 1, 14, 7)
 
-    series = trends_by_day(conn, pair, model=model)
+    col1, col2 = st.columns(2)
+    start_date = col1.date_input("From date", value=None, key="trends_start")
+    end_date = col2.date_input("To date", value=None, key="trends_end")
+    start_str = start_date.isoformat() if start_date else None
+    end_str = end_date.isoformat() if end_date else None
+
+    min_conf_trends = st.slider("Min confidence (filters noisy predictions)", 0.0, 0.9, 0.6, step=0.05, key="trends_conf")
+
+    series = trends_by_day(conn, pair, model=model, start_date=start_str, end_date=end_str, min_confidence=min_conf_trends)
 
     if not series:
         st.info(f"No trend data for {pair} with model={model}. Run batch prediction first.")
@@ -209,7 +233,7 @@ elif page == "📈 Trends":
             st.dataframe(series)
 
         # Distribution donut
-        dist = label_distribution(conn, pair, model=model)
+        dist = label_distribution(conn, pair, model=model, start_date=start_str, end_date=end_str)
         if dist["total"] > 0 and HAS_PLOTLY:
             col1, col2 = st.columns([1, 2])
             with col1:
@@ -231,8 +255,8 @@ elif page == "📈 Trends":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Alerts
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "🔴 Alerts":
-    st.title("🚨 Adversarial Spike Alerts")
+elif page == "Alerts":
+    st.title("Adversarial Spike Alerts")
 
     col1, col2 = st.columns(2)
     threshold = col1.slider("Alert threshold (% point rise)", 5, 40, 15)
@@ -245,7 +269,7 @@ elif page == "🔴 Alerts":
     else:
         st.error(f"{len(alerts)} alert(s) detected")
         for alert in alerts:
-            with st.expander(f"🔴 {alert['pair']} — {alert['severity'].upper()}"):
+            with st.expander(f"{alert['pair']} — {alert['severity'].upper()}"):
                 st.write(alert["message"])
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Delta (pp)", f"+{alert['delta_adversarial_pp']:.1f}")
@@ -256,8 +280,8 @@ elif page == "🔴 Alerts":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Headlines
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📰 Headlines":
-    st.title("📰 Headlines Browser")
+elif page == "Headlines":
+    st.title("Headlines Browser")
 
     col1, col2, col3 = st.columns(3)
     pair = col1.selectbox("Pair", all_pairs, key="hl_pair")
@@ -287,8 +311,8 @@ elif page == "📰 Headlines":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Compare Pairs
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "⚖️ Compare Pairs":
-    st.title("⚖️ Compare Two Pairs")
+elif page == "Compare Pairs":
+    st.title("Compare Two Pairs")
 
     try:
         import plotly.graph_objects as go
@@ -332,8 +356,8 @@ elif page == "⚖️ Compare Pairs":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Live Predict
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "🔮 Live Predict":
-    st.title("🔮 Live Prediction")
+elif page == "Live Predict":
+    st.title("Live Prediction")
     st.caption("Classify any headline in real-time")
 
     from nlp.inference import predict_baseline, predict_transformer
@@ -342,7 +366,7 @@ elif page == "🔮 Live Predict":
     pair_input = st.selectbox("Bilateral pair", all_pairs, index=all_pairs.index("CN-IN") if "CN-IN" in all_pairs else 0)
     run_model = st.selectbox("Model", ["both", "baseline", "transformer"])
 
-    if st.button("🔍 Classify", type="primary") and headline.strip():
+    if st.button("Classify", type="primary") and headline.strip():
         c1, c2 = pair_input.split("-")
         input_text = f"{c1}-{c2}: {headline.strip()}"
 
@@ -384,7 +408,7 @@ elif page == "🔮 Live Predict":
         primary_label = results.get("Transformer", results.get("Baseline", (None,)))[0]
         if primary_label and pair_input:
             st.markdown("---")
-            st.markdown(f"### 📚 Historical Context for {pair_input}")
+            st.markdown(f"### Historical Context for {pair_input}")
 
             # Overall distribution for this pair
             dist = label_distribution(conn, pair_input, model="baseline")
@@ -399,9 +423,9 @@ elif page == "🔮 Live Predict":
 
                 # Alignment message
                 if primary_label == dominant:
-                    alignment = f"✅ This prediction **aligns** with the historical pattern for {pair_input}."
+                    alignment = f"This prediction **aligns** with the historical pattern for {pair_input}."
                 else:
-                    alignment = f"⚠️ This prediction **differs** from the dominant historical pattern ({dominant}) for {pair_input}."
+                    alignment = f"This prediction **differs** from the dominant historical pattern ({dominant}) for {pair_input}."
 
                 st.markdown(alignment)
                 col1, col2, col3, col4 = st.columns(4)
@@ -437,8 +461,8 @@ elif page == "🔮 Live Predict":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: Attention Visualization
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "🧠 Attention":
-    st.title("🧠 Attention Visualization")
+elif page == "Attention":
+    st.title("Attention Visualization")
     st.caption("See which words DistilBERT focuses on when classifying a headline")
 
     try:
@@ -463,7 +487,7 @@ elif page == "🧠 Attention":
                                index=all_pairs.index("CN-US") if "CN-US" in all_pairs else 0,
                                key="attn_pair")
 
-    if st.button("🔍 Analyze Attention", type="primary") and headline_input.strip():
+    if st.button("Analyze Attention", type="primary") and headline_input.strip():
         c1, c2 = pair_input.split("-")
         input_text = f"{c1}-{c2}: {headline_input.strip()}"
 
@@ -530,3 +554,205 @@ elif page == "🧠 Attention":
         st.markdown("### Top Attention Words per Class (from test set)")
         st.caption("Generated by running: `python scripts/attention_viz.py`")
         st.image(str(summary_img), use_column_width=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: Causality Graph
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "Causality":
+    st.title("🔗 Causality Graph")
+    st.caption("What sequence of prediction states preceded this bilateral relationship stance?")
+
+    try:
+        import plotly.graph_objects as go
+        import math
+        HAS_PLOTLY = True
+    except ImportError:
+        HAS_PLOTLY = False
+        st.warning("pip install plotly")
+
+    from nlp.causality_queries import (
+        spike_analysis, build_causal_graph, recurring_patterns
+    )
+
+    col1, col2, col3 = st.columns(3)
+    pair = col1.selectbox("Pair", all_pairs, key="caus_pair",
+                          index=all_pairs.index("IR-US") if "IR-US" in all_pairs else 0)
+    days = col2.slider("Days back", 7, 90, 30, key="caus_days")
+    window = col3.slider("Comparison window (days)", 3, 14, 7, key="caus_window")
+    min_conf = st.slider("Min confidence threshold", 0.5, 0.95, 0.65, step=0.05)
+
+    # ── Spike analysis ────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 📊 What Changed?")
+    st.caption(f"Comparing last {window} days vs prior {window} days")
+
+    spike = spike_analysis(conn, pair, model=model, window_days=window, min_confidence=min_conf)
+
+    # Narrative
+    st.info(f"**{pair}:** {spike['narrative']}")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("This window predictions", spike["this_window"]["total"])
+    col2.metric("Prior window predictions", spike["prev_window"]["total"])
+    delta_adv = spike["deltas"]["adversarial"]
+    col3.metric("Adversarial Δ", f"{delta_adv:+.1f}pp",
+                delta_color="inverse" if delta_adv > 0 else "normal")
+
+    # Label delta breakdown
+    if HAS_PLOTLY:
+        fig = go.Figure(data=[
+            go.Bar(
+                name="This window",
+                x=["Adversarial", "Cooperative", "Neutral"],
+                y=[spike["this_window"]["pct"].get(l, 0) for l in ["adversarial", "cooperative", "neutral"]],
+                marker_color=["#F44336", "#4CAF50", "#2196F3"],
+            ),
+            go.Bar(
+                name="Prior window",
+                x=["Adversarial", "Cooperative", "Neutral"],
+                y=[spike["prev_window"]["pct"].get(l, 0) for l in ["adversarial", "cooperative", "neutral"]],
+                marker_color=["#FF8A80", "#B9F6CA", "#82B1FF"],
+            ),
+        ])
+        fig.update_layout(
+            barmode="group", title=f"{pair} — This vs Prior Window",
+            yaxis_title="%", height=300,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Top headlines driving the change
+    if spike["this_window"]["top_headlines"]:
+        st.markdown(f"**Top headlines this window (by confidence):**")
+        for h in spike["this_window"]["top_headlines"]:
+            color = LABEL_COLORS.get(h["label"], "#888")
+            st.markdown(f"""
+            <div style='border-left: 3px solid {color}; padding: 6px 10px; margin: 3px 0;
+                        background: #0e1117; border-radius: 3px; font-size:13px'>
+                <span style='color:{color}; font-weight:bold'>{h['label'].upper()}</span>
+                <span style='color:#888; font-size:11px'> {h['confidence']:.2f}</span><br>
+                {h['headline'][:120]}
+            </div>
+            """, unsafe_allow_html=True)
+
+    # ── Causal graph ──────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown(f"### 🕸️ State Transition Graph — {pair}")
+    st.caption("Each node = a 3-day window of predictions. Edges = temporal sequence. Size = number of predictions.")
+
+    graph = build_causal_graph(conn, pair, days=days, model=model,
+                               window_days=3, min_confidence=min_conf)
+
+    if not graph["nodes"]:
+        st.info(graph.get("message", "No data available for this pair."))
+    elif HAS_PLOTLY:
+        nodes = graph["nodes"]
+        edges = graph["edges"]
+        n_nodes = len(nodes)
+
+        # Layout: timeline (x = time index, y = label position)
+        label_y = {"adversarial": 2, "neutral": 1, "cooperative": 0}
+        for i, node in enumerate(nodes):
+            node["x"] = i
+            node["y"] = label_y.get(node["label"], 1) + (i % 3) * 0.15  # slight jitter
+
+        # Edge traces
+        edge_traces = []
+        node_pos = {n["id"]: (n["x"], n["y"]) for n in nodes}
+        for edge in edges:
+            x0, y0 = node_pos.get(edge["source"], (0, 0))
+            x1, y1 = node_pos.get(edge["target"], (0, 0))
+            color = "#888" if edge["same"] else "#FF9800"
+            edge_traces.append(go.Scatter(
+                x=[x0, x1, None], y=[y0, y1, None],
+                mode="lines",
+                line=dict(width=1.5, color=color),
+                hoverinfo="none",
+                showlegend=False,
+            ))
+
+        # Node trace
+        node_x = [n["x"] for n in nodes]
+        node_y = [n["y"] for n in nodes]
+        node_colors = [LABEL_COLORS[n["label"]] for n in nodes]
+        node_sizes = [max(12, min(35, 8 + n["total"] * 1.5)) for n in nodes]
+        node_hover = [
+            f"<b>{n['window_start']}</b><br>"
+            f"Dominant: {n['label']}<br>"
+            f"Predictions: {n['total']}<br>"
+            f"Avg confidence: {n['avg_confidence']}<br>"
+            + ("<br>".join(f"• {h[:60]}" for h in n['top_headlines'][:2]))
+            for n in nodes
+        ]
+
+        node_trace = go.Scatter(
+            x=node_x, y=node_y,
+            mode="markers",
+            hoverinfo="text",
+            hovertext=node_hover,
+            marker=dict(
+                size=node_sizes,
+                color=node_colors,
+                line=dict(width=1.5, color="white"),
+                opacity=0.9,
+            ),
+            showlegend=False,
+        )
+
+        fig = go.Figure(data=edge_traces + [node_trace])
+        fig.update_layout(
+            title=f"State Transition Graph — {pair} ({graph['date_range']})",
+            xaxis=dict(title="Time →", showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(
+                tickvals=[0, 1, 2],
+                ticktext=["Cooperative", "Neutral", "Adversarial"],
+                showgrid=True, gridcolor="#222",
+            ),
+            height=450,
+            plot_bgcolor="#0e1117",
+            paper_bgcolor="#0e1117",
+            font=dict(color="white"),
+            hovermode="closest",
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        col1, col2, col3 = st.columns(3)
+        col1.markdown("🔴 **Adversarial** state")
+        col2.markdown("🔵 **Neutral** state")
+        col3.markdown("🟢 **Cooperative** state")
+        st.caption(f"Total predictions: {graph['total_predictions']} | Windows: {graph['total_windows']} | Orange edges = state change")
+
+        # Transition summary
+        if graph["transitions"]:
+            st.markdown("**Most common state transitions:**")
+            for t in graph["transitions"][:5]:
+                st.markdown(f"- `{t['transition']}` — {t['count']} times")
+
+        # Adversarial precursors
+        if graph["adversarial_precursors"]:
+            st.markdown("**What typically precedes adversarial states:**")
+            for label, count in sorted(graph["adversarial_precursors"].items(), key=lambda x: -x[1]):
+                color = LABEL_COLORS.get(label, "#888")
+                st.markdown(f"- <span style='color:{color}'>{label}</span> → adversarial: **{count} times**",
+                            unsafe_allow_html=True)
+
+    # ── Recurring patterns ────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 🔄 Recurring Patterns")
+    st.caption("3-step sequences that appear more than once")
+
+    patterns = recurring_patterns(conn, pair, days=days, model=model, min_confidence=min_conf)
+    if not patterns:
+        st.info("No recurring patterns found. Try increasing the days range.")
+    else:
+        for p in patterns[:8]:
+            colors = [LABEL_COLORS.get(s, "#888") for s in p["steps"]]
+            steps_html = " → ".join(
+                f"<span style='color:{c}; font-weight:bold'>{s}</span>"
+                for s, c in zip(p["steps"], colors)
+            )
+            badge = "⚠️" if p["ends_adversarial"] else "✅"
+            st.markdown(
+                f"{badge} {steps_html} &nbsp; <span style='color:#888'>({p['count']}×)</span>",
+                unsafe_allow_html=True
+            )
