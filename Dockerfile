@@ -22,7 +22,7 @@ RUN mkdir -p data models/transformer_bilateral logs
 EXPOSE 7860
 
 # Run Streamlit
-CMD ["streamlit", "run", "demo/demo_app.py", \
+CMD ["streamlit", "run", "main/main_app.py", \
      "--server.port=7860", \
      "--server.address=0.0.0.0", \
      "--server.headless=true", \
