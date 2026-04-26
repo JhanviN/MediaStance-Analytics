@@ -23,6 +23,7 @@ def connect(db_path: Path | None = None) -> sqlite3.Connection:
 
 
 def init_predictions_db(conn: sqlite3.Connection) -> None:
+    # Create table without cameo columns (for backward compat with existing DBs)
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS predictions (
@@ -46,7 +47,19 @@ def init_predictions_db(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_predictions_model ON predictions(model);
         """
     )
-    conn.commit()
+    # Migrate existing DBs — add cameo columns if missing
+    for col, coltype in [("cameo_code", "TEXT"), ("cameo_description", "TEXT")]:
+        try:
+            conn.execute(f"ALTER TABLE predictions ADD COLUMN {col} {coltype}")
+            conn.commit()
+        except Exception:
+            pass  # column already exists
+    # Add cameo index after columns exist
+    try:
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_predictions_cameo ON predictions(cameo_code)")
+        conn.commit()
+    except Exception:
+        pass
 
 
 def utc_now_iso() -> str:
@@ -64,18 +77,23 @@ def insert_prediction(
     label: str,
     confidence: float,
     probs: Dict[str, float],
+    cameo_code: Optional[str] = None,
+    cameo_description: Optional[str] = None,
+    created_at: Optional[str] = None,
     meta: Optional[Dict[str, Any]] = None,
 ) -> int:
     c1, c2 = normalize_stored_countries(country_1, country_2)
+    ts = created_at if created_at else utc_now_iso()
     cur = conn.execute(
         """
         INSERT INTO predictions (
             created_at, headline, text_used, country_1, country_2,
-            model, label, confidence, p_adversarial, p_cooperative, p_neutral, meta_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            model, label, confidence, p_adversarial, p_cooperative, p_neutral,
+            cameo_code, cameo_description, meta_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            utc_now_iso(),
+            ts,
             headline[:2000],
             text_used[:8000],
             c1,
@@ -86,6 +104,8 @@ def insert_prediction(
             probs.get("adversarial"),
             probs.get("cooperative"),
             probs.get("neutral"),
+            cameo_code,
+            cameo_description,
             json.dumps(meta or {}),
         ),
     )
