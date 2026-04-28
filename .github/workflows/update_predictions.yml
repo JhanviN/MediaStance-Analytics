@@ -9,14 +9,10 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -36,23 +32,56 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python -c "
+          python - <<'EOF'
+          import os
           from huggingface_hub import snapshot_download
           snapshot_download(
               repo_id='JhanviN/mediastance-deploy',
               local_dir='models/transformer_bilateral',
-              token='${{ secrets.HF_TOKEN }}'
+              token=os.environ['HF_TOKEN'],
           )
           print('Model downloaded')
-          "
+          EOF
+
+      - name: Download latest predictions DB from HF Dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          python - <<'EOF'
+          import os, shutil
+          from huggingface_hub import hf_hub_download
+          path = hf_hub_download(
+              repo_id='JhanviN/mediastance-db',
+              repo_type='dataset',
+              filename='predictions.db',
+              token=os.environ['HF_TOKEN'],
+          )
+          shutil.copy(path, 'data/predictions.db')
+          import sqlite3
+          n = sqlite3.connect('data/predictions.db').execute('SELECT COUNT(*) FROM predictions').fetchone()[0]
+          print(f'DB downloaded — {n} existing predictions')
+          EOF
 
       - name: Run live pipeline
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: python scripts/live_pipeline.py --once --model baseline
 
-      - name: Commit updated predictions DB
+      - name: Upload updated predictions DB to HF Dataset
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add data/predictions.db
-          git diff --staged --quiet || git commit -m "chore: update predictions [$(date -u '+%Y-%m-%d')]"
-          git push
+          python - <<'EOF'
+          import os, sqlite3
+          from huggingface_hub import HfApi
+          n = sqlite3.connect('data/predictions.db').execute('SELECT COUNT(*) FROM predictions').fetchone()[0]
+          print(f'Uploading DB with {n} predictions...')
+          HfApi(token=os.environ['HF_TOKEN']).upload_file(
+              path_or_fileobj='data/predictions.db',
+              path_in_repo='predictions.db',
+              repo_id='JhanviN/mediastance-db',
+              repo_type='dataset',
+              commit_message=f'chore: daily update — {n} predictions',
+          )
+          print('Upload complete')
+          EOF
