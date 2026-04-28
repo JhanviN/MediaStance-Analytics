@@ -167,3 +167,33 @@ def get_compare(
         )
     except ValueError as e:
         raise _bad_pair(e) from e
+
+
+@router.get("/causality")
+def get_causality(
+    pair: Optional[str] = Query(None, description="Bilateral pair (required)", examples=["IN-US"]),
+    model: str = Query(DEFAULT_MODEL),
+    days: int = Query(30, ge=7, le=180),
+    window_days: int = Query(3, ge=1, le=14),
+    min_confidence: float = Query(0.65, ge=0.0, le=1.0),
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    """Causal graph nodes/edges + spike analysis for a bilateral pair."""
+    from nlp.causality_queries import build_causal_graph, spike_analysis, recurring_patterns
+    pair = _require_pair(pair)
+    try:
+        graph = build_causal_graph(
+            conn, pair, days=days, model=model,
+            window_days=window_days, min_confidence=min_confidence,
+        )
+        spike = spike_analysis(
+            conn, pair, model=model,
+            window_days=7, min_confidence=min_confidence,
+        )
+        patterns = recurring_patterns(
+            conn, pair, days=days, model=model,
+            window_days=window_days, min_confidence=min_confidence,
+        )
+        return {"pair": pair, "graph": graph, "spike": spike, "patterns": patterns}
+    except ValueError as e:
+        raise _bad_pair(e) from e

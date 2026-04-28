@@ -113,3 +113,73 @@ export async function classify(
   if (!res.ok) throw new Error(`classify → ${res.status}`);
   return res.json();
 }
+
+// ── Causality types ───────────────────────────────────────────────────────────
+
+export interface CausalNode {
+  id: string;
+  label: "adversarial" | "cooperative" | "neutral";
+  window_start: string;
+  window_end: string;
+  total: number;
+  avg_confidence: number;
+  top_headlines: string[];
+  color: string;
+}
+
+export interface CausalEdge {
+  source: string;
+  target: string;
+  source_label: string;
+  target_label: string;
+  transition: string;
+  same: boolean;
+}
+
+export interface SpikeWindow {
+  total: number;
+  pct: { adversarial: number; cooperative: number; neutral: number };
+  top_headlines: { headline: string; confidence: number; label: string }[];
+}
+
+export interface SpikeAnalysis {
+  pair: string;
+  narrative: string;
+  deltas: { adversarial: number; cooperative: number; neutral: number };
+  this_window: SpikeWindow;
+  prev_window: SpikeWindow;
+}
+
+export interface CausalPattern {
+  pattern: string;
+  steps: string[];
+  count: number;
+  ends_adversarial: boolean;
+}
+
+export interface CausalGraph {
+  nodes: CausalNode[];
+  edges: CausalEdge[];
+  transitions: { from: string; to: string; count: number; transition: string }[];
+  adversarial_precursors: Record<string, number>;
+  total_predictions: number;
+  date_range?: string;
+  message?: string;
+}
+
+export interface CausalityResponse {
+  pair: string;
+  graph: CausalGraph;
+  spike: SpikeAnalysis;
+  patterns: CausalPattern[];
+}
+
+export const fetchCausality = (
+  pair: string,
+  model = "baseline",
+  days = 30,
+  minConfidence = 0.65,
+) =>
+  get<CausalityResponse>(
+    `/causality?pair=${pair}&model=${model}&days=${days}&min_confidence=${minConfidence}`,
+  );

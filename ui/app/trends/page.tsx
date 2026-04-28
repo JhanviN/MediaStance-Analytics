@@ -111,7 +111,7 @@ function TrendsInner() {
                 <YAxis tick={{ fill: "#8a93a8", fontSize: 11 }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
                 <Tooltip
                   contentStyle={{ background: "#ffffff", border: "1px solid #e2e6ef", borderRadius: 6, fontSize: 12 }}
-                  formatter={(v: number) => `${v}%`}
+                  formatter={(v) => [`${v}%`]}
                 />
                 <Bar dataKey="adversarial" fill={ADV_COLOR} name="Adversarial" radius={[3,3,0,0]} />
                 <Bar dataKey="cooperative" fill={COOP_COLOR} name="Cooperative" radius={[3,3,0,0]} />
@@ -125,7 +125,7 @@ function TrendsInner() {
                 <Tooltip
                   contentStyle={{ background: "#ffffff", border: "1px solid #e2e6ef", borderRadius: 6, fontSize: 12 }}
                   labelStyle={{ color: "#8a93a8" }}
-                  formatter={(v: number) => `${v}%`}
+                  formatter={(v) => [`${v}%`]}
                 />
                 <Line type="monotone" dataKey="adversarial" stroke={ADV_COLOR} dot={false} strokeWidth={2} name="Adversarial" />
                 <Line type="monotone" dataKey="cooperative" stroke={COOP_COLOR} dot={false} strokeWidth={2} name="Cooperative" />

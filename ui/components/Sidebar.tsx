@@ -11,6 +11,7 @@ const NAV = [
   { href: "/compare", label: "Compare Pairs" },
   { href: "/predict", label: "Live Predict" },
   { href: "/attention", label: "Attention" },
+  { href: "/causality", label: "Causality" },
 ];
 
 export default function Sidebar() {
