@@ -49,7 +49,34 @@ def _run_live_pipeline() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start background scheduler on startup, stop on shutdown."""
+    """Download DB from HF Dataset, start background scheduler, stop on shutdown."""
+
+    # ── DB sync: download latest predictions.db on startup ───────────────────
+    try:
+        from core.db_sync import init_sync, start_background_sync
+        init_sync()          # download DB from HF Dataset (no-op if env vars not set)
+        start_background_sync()  # upload every 30 min
+    except Exception as e:
+        logger.warning(f"DB sync init failed: {e}")
+
+    # ── Download transformer model from HF Hub if missing ────────────────────
+    _model_dir = ROOT / "models" / "transformer_bilateral"
+    if not (_model_dir / "model.safetensors").exists():
+        hf_repo = os.environ.get("HF_MODEL_REPO", "JhanviN/mediastance-deploy").strip()
+        if hf_repo:
+            try:
+                from huggingface_hub import snapshot_download
+                logger.info(f"Downloading transformer model from {hf_repo}...")
+                snapshot_download(
+                    repo_id=hf_repo,
+                    local_dir=str(_model_dir),
+                    token=os.environ.get("HF_TOKEN", "").strip() or None,
+                )
+                logger.info("Transformer model downloaded.")
+            except Exception as e:
+                logger.warning(f"Could not download transformer model: {e}")
+
+    # ── Background pipeline scheduler ────────────────────────────────────────
     interval = int(os.environ.get("PIPELINE_INTERVAL_MINUTES", "60"))
     scheduler = None
 
@@ -67,7 +94,7 @@ async def lifespan(app: FastAPI):
             scheduler.start()
             logger.info(f"Live pipeline scheduler started — runs every {interval} min")
         except ImportError:
-            logger.warning("apscheduler not installed — scheduler disabled. Run: pip install apscheduler")
+            logger.warning("apscheduler not installed — scheduler disabled.")
 
     yield  # app runs here
 
