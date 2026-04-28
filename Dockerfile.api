@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir -r requirements_api.txt
 
 COPY . .
 
+# Verify core package is present (fail fast if build context is wrong)
+RUN python -c "import core; print('core package found')"
+
 RUN mkdir -p data models/transformer_bilateral logs
 
 EXPOSE 8000
