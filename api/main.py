@@ -54,16 +54,18 @@ async def lifespan(app: FastAPI):
 
     # ── DB sync: download latest predictions.db on startup ───────────────────
     try:
-        import importlib
-        # Ensure repo root is on path
+        # Ensure repo root on path (belt-and-suspenders for Docker)
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
-        db_sync = importlib.import_module("core.db_sync")
-        db_sync.init_sync()
-        db_sync.start_background_sync()
+        from core.db_sync import init_sync, start_background_sync  # noqa: E402
+        init_sync()
+        start_background_sync()
         logger.info("DB sync initialized successfully")
+    except ModuleNotFoundError as e:
+        # Log the full sys.path so we can debug exactly what's missing
+        logger.warning(f"DB sync failed — {e}. sys.path={sys.path[:5]}")
     except Exception as e:
-        logger.warning(f"DB sync init failed: {e} (type: {type(e).__name__}) — running without DB sync")
+        logger.warning(f"DB sync init failed: {e} (type: {type(e).__name__})")
 
     # ── Download transformer model from HF Hub if missing ────────────────────
     _model_dir = ROOT / "models" / "transformer_bilateral"
