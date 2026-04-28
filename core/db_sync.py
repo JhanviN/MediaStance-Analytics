@@ -1,21 +1,19 @@
 """
 HF Dataset-backed persistence for predictions.db.
 
-On HuggingFace Spaces the container filesystem is ephemeral ΓÇö it resets on
-every restart.  This module solves that by treating a private HF Dataset repo
-as the canonical store for predictions.db:
+The container filesystem is ephemeral on both HF Spaces and Render free tier.
+This module treats a private HF Dataset repo as the canonical store:
 
-  startup  ΓåÆ download latest DB from HF Dataset repo (if available)
-  periodic ΓåÆ upload current DB back every SYNC_INTERVAL_MINUTES minutes
-  shutdown ΓåÆ best-effort final upload via atexit
+  startup  -> download latest DB from HF Dataset repo (if available)
+  periodic -> upload current DB back every SYNC_INTERVAL_MINUTES minutes
+  shutdown -> best-effort final upload via atexit
 
-Required environment variables (set in HF Space secrets):
-  HF_TOKEN          ΓÇö HF token with write access to the dataset repo
-  HF_DATASET_REPO   ΓÇö e.g. "JhanviN/mediastance-db"  (dataset repo, not model repo)
+Required environment variables:
+  HF_TOKEN          -- HF token with write access to the dataset repo
+  HF_DATASET_REPO   -- e.g. "JhanviN/mediastance-db"
 
 Optional:
-  SYNC_INTERVAL_MINUTES  ΓÇö how often to push DB back (default: 30)
-  HF_SPACE              ΓÇö set to "1" to enable sync (auto-detected on HF Spaces)
+  SYNC_INTERVAL_MINUTES  -- how often to push DB back (default: 30)
 """
 
 from __future__ import annotations
@@ -25,7 +23,6 @@ import logging
 import os
 import shutil
 import threading
-import time
 from pathlib import Path
 
 logger = logging.getLogger("mediastance.db_sync")
@@ -38,71 +35,57 @@ _sync_thread: threading.Thread | None = None
 _stop_event = threading.Event()
 
 
-def _is_hf_space() -> bool:
-    """Detect if we're running inside a HuggingFace Space."""
-    return (
-        os.environ.get("HF_SPACE", "") == "1"
-        or os.environ.get("SPACE_ID") is not None
-        or os.environ.get("HF_SPACE_ID") is not None
-    )
-
-
 def _get_config() -> tuple[str | None, str | None, int]:
-    token = os.environ.get("HF_TOKEN")
-    dataset_repo = os.environ.get("HF_DATASET_REPO")
+    token = os.environ.get("HF_TOKEN", "").strip() or None
+    dataset_repo = os.environ.get("HF_DATASET_REPO", "").strip() or None
     interval = int(os.environ.get("SYNC_INTERVAL_MINUTES", "30"))
     return token, dataset_repo, interval
 
 
 def download_db() -> bool:
     """
-    Download predictions.db from HF Dataset repo to data/predictions.db.
-    Returns True if successful, False otherwise (app will use whatever is local).
+    Download predictions.db from HF Dataset repo.
+    Returns True if successful.
     """
     token, dataset_repo, _ = _get_config()
     if not token or not dataset_repo:
-        logger.info("db_sync: HF_TOKEN or HF_DATASET_REPO not set ΓÇö skipping download")
+        logger.info("db_sync: HF_TOKEN or HF_DATASET_REPO not set -- skipping download")
         return False
 
     try:
         from huggingface_hub import hf_hub_download
         logger.info(f"db_sync: downloading {DB_FILENAME} from {dataset_repo} ...")
 
-        # Download to a temp path first, then atomically replace
-        tmp_path = DB_PATH.with_suffix(".tmp")
-        hf_hub_download(
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        downloaded = hf_hub_download(
             repo_id=dataset_repo,
             repo_type="dataset",
             filename=DB_FILENAME,
-            local_dir=str(tmp_path.parent),
+            local_dir=str(DB_PATH.parent),
             local_dir_use_symlinks=False,
             token=token,
         )
 
-        downloaded = tmp_path.parent / DB_FILENAME
-        if downloaded.exists() and downloaded.stat().st_size > 0:
-            shutil.move(str(downloaded), str(DB_PATH))
+        if downloaded and Path(downloaded).exists() and Path(downloaded).stat().st_size > 0:
+            if str(Path(downloaded).resolve()) != str(DB_PATH.resolve()):
+                shutil.move(downloaded, str(DB_PATH))
             size_mb = DB_PATH.stat().st_size / 1024 / 1024
-            logger.info(f"db_sync: downloaded {size_mb:.1f} MB ΓåÆ {DB_PATH}")
+            logger.info(f"db_sync: downloaded {size_mb:.1f} MB -> {DB_PATH}")
             return True
         else:
             logger.warning("db_sync: downloaded file is empty or missing")
             return False
 
     except Exception as e:
-        # File not found on first deploy ΓÇö that's fine, we'll upload after first run
         if "404" in str(e) or "not found" in str(e).lower() or "EntryNotFoundError" in type(e).__name__:
-            logger.info("db_sync: no DB in dataset repo yet ΓÇö will upload after first run")
+            logger.info("db_sync: no DB in dataset repo yet -- will upload after first run")
         else:
             logger.warning(f"db_sync: download failed: {e}")
         return False
 
 
 def upload_db() -> bool:
-    """
-    Upload current predictions.db to HF Dataset repo.
-    Returns True if successful.
-    """
+    """Upload current predictions.db to HF Dataset repo."""
     token, dataset_repo, _ = _get_config()
     if not token or not dataset_repo:
         return False
@@ -114,20 +97,17 @@ def upload_db() -> bool:
     try:
         from huggingface_hub import HfApi
         api = HfApi(token=token)
-
         size_mb = DB_PATH.stat().st_size / 1024 / 1024
-        logger.info(f"db_sync: uploading {size_mb:.1f} MB ΓåÆ {dataset_repo} ...")
-
+        logger.info(f"db_sync: uploading {size_mb:.1f} MB -> {dataset_repo} ...")
         api.upload_file(
             path_or_fileobj=str(DB_PATH),
             path_in_repo=DB_FILENAME,
             repo_id=dataset_repo,
             repo_type="dataset",
-            commit_message=f"sync: predictions.db update",
+            commit_message="sync: predictions.db update",
         )
         logger.info("db_sync: upload complete")
         return True
-
     except Exception as e:
         logger.warning(f"db_sync: upload failed: {e}")
         return False
@@ -135,27 +115,22 @@ def upload_db() -> bool:
 
 def _sync_loop(interval_minutes: int) -> None:
     """Background thread: upload DB every interval_minutes."""
-    logger.info(f"db_sync: background sync started ΓÇö every {interval_minutes} min")
+    logger.info(f"db_sync: background sync started -- every {interval_minutes} min")
     while not _stop_event.wait(timeout=interval_minutes * 60):
         upload_db()
     logger.info("db_sync: background sync stopped")
 
 
 def start_background_sync() -> None:
-    """
-    Start the periodic upload thread.
-    Call this once after the app is initialized.
-    Only runs if HF_TOKEN + HF_DATASET_REPO are set.
-    """
+    """Start the periodic upload thread. No-op if env vars not set."""
     global _sync_thread
 
     token, dataset_repo, interval = _get_config()
     if not token or not dataset_repo:
-        logger.info("db_sync: sync disabled (HF_TOKEN/HF_DATASET_REPO not set)")
         return
 
     if _sync_thread and _sync_thread.is_alive():
-        return  # already running
+        return
 
     _stop_event.clear()
     _sync_thread = threading.Thread(
@@ -165,8 +140,6 @@ def start_background_sync() -> None:
         name="db-sync",
     )
     _sync_thread.start()
-
-    # Register best-effort upload on process exit
     atexit.register(upload_db)
     logger.info(f"db_sync: sync thread started, interval={interval}min, repo={dataset_repo}")
 
@@ -178,14 +151,13 @@ def stop_background_sync() -> None:
 
 def init_sync() -> bool:
     """
-    Full init: download DB on startup, then start background upload thread.
-    Call this once at app startup, before connecting to the DB.
-
-    Returns True if a fresh DB was downloaded from HF.
+    Download DB on startup and start background upload thread.
+    Runs on any platform (HF Spaces, Render, local) when env vars are set.
+    Returns True if a fresh DB was downloaded.
     """
-    if not _is_hf_space():
-        # Running locally ΓÇö no sync needed
-        logger.info("db_sync: not on HF Space, sync disabled")
+    token, dataset_repo, _ = _get_config()
+    if not token or not dataset_repo:
+        logger.info("db_sync: HF_TOKEN or HF_DATASET_REPO not set -- sync disabled")
         return False
 
     downloaded = download_db()
