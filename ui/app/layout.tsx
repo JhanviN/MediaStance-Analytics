@@ -3,8 +3,12 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "MediaStance",
-  description: "Bilateral trade sentiment analytics",
+  title: "MediaStance Analytics",
+  description: "Real-time bilateral geopolitical sentiment classification from news headlines",
+  icons: {
+    icon: "/msa.svg",
+    apple: "/msa.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

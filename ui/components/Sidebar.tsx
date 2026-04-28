@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -34,8 +35,9 @@ export default function Sidebar() {
       }}
     >
       {/* Logo */}
-      <div style={{ padding: "0 20px 24px", borderBottom: "1px solid var(--border)" }}>
-        <span style={{ fontWeight: 500, fontSize: 16, letterSpacing: "-0.3px" }}>
+      <div style={{ padding: "0 20px 24px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 10 }}>
+        <Image src="/msa.svg" alt="MediaStance" width={32} height={32} style={{ borderRadius: 8 }} />
+        <span style={{ fontWeight: 500, fontSize: 15, letterSpacing: "-0.3px" }}>
           Media<span style={{ color: "var(--adv)" }}>Stance</span>
         </span>
       </div>
