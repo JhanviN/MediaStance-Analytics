@@ -50,11 +50,10 @@ def _run_live_pipeline() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Download DB from HF Dataset, start background scheduler, stop on shutdown."""
-    logger.info(f"Starting up. ROOT={ROOT}, sys.path includes ROOT: {str(ROOT) in sys.path}")
+    logger.info(f"Starting up. ROOT={ROOT}")
 
     # ── DB sync: download latest predictions.db on startup ───────────────────
     try:
-        import sys
         import importlib
         # Ensure repo root is on path
         if str(ROOT) not in sys.path:
