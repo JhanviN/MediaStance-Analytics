@@ -1,0 +1,17 @@
+# FastAPI backend requirements for Render deployment
+# Lighter than requirements_hf.txt — no Streamlit, no CUDA
+
+transformers==4.44.2
+torch==2.2.0+cpu  --extra-index-url https://download.pytorch.org/whl/cpu
+fastapi==0.110.0
+uvicorn==0.27.0
+scikit-learn==1.5.2
+joblib==1.4.0
+numpy==1.26.4
+requests==2.31.0
+feedparser==6.0.11
+beautifulsoup4==4.12.3
+python-dotenv==1.0.0
+apscheduler==3.10.4
+huggingface_hub==0.24.0
+accelerate==0.33.0
