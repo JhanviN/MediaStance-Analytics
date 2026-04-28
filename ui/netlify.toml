@@ -1,0 +1,13 @@
+[build]
+  base    = "ui"
+  command = "npm run build"
+  publish = "out"          # next export outputs to /out
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# SPA fallback — route all paths to index so Next.js client router works
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
