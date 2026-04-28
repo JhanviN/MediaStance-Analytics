@@ -27,7 +27,10 @@ function TrendsInner() {
   const [model, setModel] = useState<"baseline" | "transformer">(
     (params.get("model") as "baseline" | "transformer") ?? "baseline"
   );
-  const [dateRange, setDateRange] = useState<DateRange>({ startDate: undefined, endDate: undefined });
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10),
+    endDate: undefined,
+  });
   const [data, setData] = useState<TrendsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -50,18 +53,23 @@ function TrendsInner() {
     });
   }, [pair, model, dateRange]);
 
-  // Convert fractions (0-1) to percentages for display
+  // Convert fractions (0-1) to percentages, merge rolling avg into same series
+  const rollingByDate = new Map(
+    data?.rolling_adversarial?.map((p) => [
+      p.date,
+      +((p.adversarial_rolling_avg ?? 0) * 100).toFixed(1),
+    ]) ?? []
+  );
+
   const chartSeries = data?.series.map((p) => ({
     ...p,
     adversarial: +(p.adversarial * 100).toFixed(1),
     cooperative: +(p.cooperative * 100).toFixed(1),
     neutral: +(p.neutral * 100).toFixed(1),
+    adv_rolling: rollingByDate.get(p.date) ?? null,
   }));
 
-  const rollingData = data?.rolling_adversarial?.map((p) => ({
-    date: p.date,
-    value: +((p.adversarial_rolling_avg ?? 0) * 100).toFixed(1),
-  }));
+  const hasRolling = (chartSeries ?? []).some((p) => p.adv_rolling !== null);
 
   return (
     <div>
@@ -123,7 +131,13 @@ function TrendsInner() {
             ) : (
               <LineChart data={chartSeries} margin={{ top: 4, right: 16, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e6ef" />
-                <XAxis dataKey="date" tick={{ fill: "#8a93a8", fontSize: 11 }} tickLine={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fill: "#8a93a8", fontSize: 11 }}
+                  tickLine={false}
+                  tickFormatter={(d: string) => d.slice(5)}
+                  interval="preserveStartEnd"
+                />
                 <YAxis tick={{ fill: "#8a93a8", fontSize: 11 }} tickLine={false} axisLine={false} unit="%" domain={[0, 100]} />
                 <Tooltip
                   contentStyle={{ background: "#ffffff", border: "1px solid #e2e6ef", borderRadius: 6, fontSize: 12 }}
@@ -133,16 +147,16 @@ function TrendsInner() {
                 <Line type="monotone" dataKey="adversarial" stroke={ADV_COLOR} dot={false} strokeWidth={2} name="Adversarial" />
                 <Line type="monotone" dataKey="cooperative" stroke={COOP_COLOR} dot={false} strokeWidth={2} name="Cooperative" />
                 <Line type="monotone" dataKey="neutral" stroke={NEUT_COLOR} dot={false} strokeWidth={2} name="Neutral" />
-                {rollingData && rollingData.length > 0 && (
+                {hasRolling && (
                   <Line
                     type="monotone"
-                    data={rollingData}
-                    dataKey="value"
+                    dataKey="adv_rolling"
                     stroke={ADV_COLOR}
                     dot={false}
                     strokeWidth={1.5}
                     strokeDasharray="4 2"
                     name="Adv 7d avg"
+                    connectNulls
                   />
                 )}
               </LineChart>
