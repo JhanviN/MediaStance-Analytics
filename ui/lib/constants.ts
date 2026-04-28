@@ -13,3 +13,19 @@ export const ALL_PAIRS = [
   "IN-IR", "IL-IN", "CN-RU", "CN-IR", "CN-PK",
   "RU-US", "IR-US", "IL-US", "IL-IR", "IR-RU",
 ];
+
+export const COUNTRY_NAMES: Record<string, string> = {
+  CN: "China",
+  IN: "India",
+  US: "USA",
+  RU: "Russia",
+  PK: "Pakistan",
+  IR: "Iran",
+  IL: "Israel",
+};
+
+/** "CN-US" → "China – USA" */
+export function pairLabel(pair: string): string {
+  const [a, b] = pair.split("-");
+  return `${COUNTRY_NAMES[a] ?? a} – ${COUNTRY_NAMES[b] ?? b}`;
+}

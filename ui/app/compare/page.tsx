@@ -4,10 +4,11 @@ import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchCompare, type PairSummary } from "@/lib/api";
-import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS } from "@/lib/constants";
+import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS, pairLabel } from "@/lib/constants";
 import SegmentBar from "@/components/SegmentBar";
 import ModelToggle from "@/components/ModelToggle";
 import ErrorBanner from "@/components/ErrorBanner";
+import DateRangeFilter, { type DateRange } from "@/components/DateRangeFilter";
 
 function StatRow({ label, v1, v2, color }: { label: string; v1: number; v2: number; color: string }) {
   return (
@@ -32,6 +33,7 @@ function CompareInner() {
   const [pair1, setPair1] = useState(params.get("pair1") ?? "IN-US");
   const [pair2, setPair2] = useState(params.get("pair2") ?? "CN-US");
   const [model, setModel] = useState<"baseline" | "transformer">("baseline");
+  const [dateRange, setDateRange] = useState<DateRange>({ startDate: undefined, endDate: undefined });
   const [data, setData] = useState<{ pair1: PairSummary; pair2: PairSummary } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,18 +44,18 @@ function CompareInner() {
   useEffect(() => {
     setData(null);
     setError(null);
-    fetchCompare(pair1, pair2, model)
+    fetchCompare(pair1, pair2, model, dateRange.startDate, dateRange.endDate)
       .then(setData)
       .catch((e) => setError(e.message));
-  }, [pair1, pair2, model]);
+  }, [pair1, pair2, model, dateRange]);
 
   const PairSelect = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", padding: "5px 10px", fontSize: 13, fontFamily: "monospace" }}
+      style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", padding: "5px 10px", fontSize: 13 }}
     >
-      {ALL_PAIRS.map((p) => <option key={p}>{p}</option>)}
+      {ALL_PAIRS.map((p) => <option key={p} value={p}>{pairLabel(p)}</option>)}
     </select>
   );
 
@@ -65,6 +67,7 @@ function CompareInner() {
         <span style={{ color: "var(--muted)" }}>vs</span>
         <PairSelect value={pair2} onChange={setPair2} />
         <ModelToggle value={model} onChange={setModel} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -79,7 +82,7 @@ function CompareInner() {
           <div style={{ display: "flex", gap: 12, marginBottom: 4 }}>
             <div style={{ flex: 1 }} />
             {[data.pair1, data.pair2].map((p) => (
-              <span key={p.pair} className="mono" style={{ width: 60, textAlign: "right", fontWeight: 500 }}>{p.pair}</span>
+              <span key={p.pair} style={{ width: 100, textAlign: "right", fontWeight: 500, fontSize: 12 }}>{pairLabel(p.pair)}</span>
             ))}
           </div>
 
@@ -91,11 +94,11 @@ function CompareInner() {
               <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 6 }}>Distribution</div>
               <div style={{ display: "flex", gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{data.pair1.pair}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{pairLabel(data.pair1.pair)}</div>
                   <SegmentBar adv={data.pair1.percent.adversarial} coop={data.pair1.percent.cooperative} neut={data.pair1.percent.neutral} height={8} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{data.pair2.pair}</div>
+                  <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 4 }}>{pairLabel(data.pair2.pair)}</div>
                   <SegmentBar adv={data.pair2.percent.adversarial} coop={data.pair2.percent.cooperative} neut={data.pair2.percent.neutral} height={8} />
                 </div>
               </div>

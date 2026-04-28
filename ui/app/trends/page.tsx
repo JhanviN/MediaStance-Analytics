@@ -7,9 +7,10 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { fetchTrends, type TrendsResponse } from "@/lib/api";
-import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS } from "@/lib/constants";
+import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS, pairLabel } from "@/lib/constants";
 import ModelToggle from "@/components/ModelToggle";
 import ErrorBanner from "@/components/ErrorBanner";
+import DateRangeFilter, { type DateRange } from "@/components/DateRangeFilter";
 
 export default function TrendsPage() {
   return (
@@ -26,6 +27,7 @@ function TrendsInner() {
   const [model, setModel] = useState<"baseline" | "transformer">(
     (params.get("model") as "baseline" | "transformer") ?? "baseline"
   );
+  const [dateRange, setDateRange] = useState<DateRange>({ startDate: undefined, endDate: undefined });
   const [data, setData] = useState<TrendsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -40,13 +42,13 @@ function TrendsInner() {
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetchTrends(pair, model, 7);
+        const res = await fetchTrends(pair, model, 7, dateRange.startDate, dateRange.endDate);
         setData(res);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : "Unknown error");
       }
     });
-  }, [pair, model]);
+  }, [pair, model, dateRange]);
 
   // Convert fractions (0-1) to percentages for display
   const chartSeries = data?.series.map((p) => ({
@@ -78,9 +80,10 @@ function TrendsInner() {
             fontFamily: "monospace",
           }}
         >
-          {ALL_PAIRS.map((p) => <option key={p}>{p}</option>)}
+          {ALL_PAIRS.map((p) => <option key={p} value={p}>{pairLabel(p)}</option>)}
         </select>
         <ModelToggle value={model} onChange={setModel} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
       {error && <ErrorBanner message={error} />}

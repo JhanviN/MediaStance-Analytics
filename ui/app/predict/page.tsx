@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { classify, type ClassifyResponse } from "@/lib/api";
-import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS, LABEL_COLORS } from "@/lib/constants";
+import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS, LABEL_COLORS, pairLabel } from "@/lib/constants";
 import ErrorBanner from "@/components/ErrorBanner";
 
 function ProbBar({ label, value }: { label: string; value: number }) {
@@ -111,7 +111,7 @@ export default function PredictPage() {
             onChange={(e) => setPair(e.target.value)}
             style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", padding: "7px 10px", fontSize: 13, fontFamily: "monospace" }}
           >
-            {ALL_PAIRS.map((p) => <option key={p}>{p}</option>)}
+            {ALL_PAIRS.map((p) => <option key={p} value={p}>{pairLabel(p)}</option>)}
           </select>
           <select
             value={model}

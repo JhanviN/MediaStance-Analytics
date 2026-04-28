@@ -77,28 +77,44 @@ export interface ClassifyResponse {
 
 // ── API calls ─────────────────────────────────────────────────────────────────
 
-export const fetchSummaryAll = (model = "baseline") =>
-  get<SummaryAll>(`/summary/all?model=${model}`);
+export const fetchSummaryAll = (model = "baseline", startDate?: string, endDate?: string) => {
+  const p = new URLSearchParams({ model });
+  if (startDate) p.set("start_date", startDate);
+  if (endDate) p.set("end_date", endDate);
+  return get<SummaryAll>(`/summary/all?${p}`);
+};
 
-export const fetchAlerts = (model = "baseline") =>
-  get<AlertsResponse>(`/alerts?model=${model}`);
+export const fetchAlerts = (model = "baseline", days = 7, threshold = 15) =>
+  get<AlertsResponse>(`/alerts?model=${model}&days=${days}&threshold_pp=${threshold}`);
 
-export const fetchTrends = (pair: string, model = "baseline", rolling = 7) =>
-  get<TrendsResponse>(`/trends?pair=${pair}&model=${model}&rolling=${rolling}`);
+export const fetchTrends = (pair: string, model = "baseline", rolling = 7, startDate?: string, endDate?: string) => {
+  const p = new URLSearchParams({ pair, model, rolling: String(rolling) });
+  if (startDate) p.set("start_date", startDate);
+  if (endDate) p.set("end_date", endDate);
+  return get<TrendsResponse>(`/trends?${p}`);
+};
 
 export const fetchHeadlines = (
   pair: string,
   model = "baseline",
   label?: string,
-  limit = 100
+  limit = 100,
+  startDate?: string,
+  endDate?: string,
 ) => {
   const params = new URLSearchParams({ pair, model, limit: String(limit) });
   if (label) params.set("label", label);
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
   return get<HeadlinesResponse>(`/headlines?${params}`);
 };
 
-export const fetchCompare = (pair1: string, pair2: string, model = "baseline") =>
-  get<CompareResponse>(`/compare?pair1=${pair1}&pair2=${pair2}&model=${model}`);
+export const fetchCompare = (pair1: string, pair2: string, model = "baseline", startDate?: string, endDate?: string) => {
+  const p = new URLSearchParams({ pair1, pair2, model });
+  if (startDate) p.set("start_date", startDate);
+  if (endDate) p.set("end_date", endDate);
+  return get<CompareResponse>(`/compare?${p}`);
+};
 
 export async function classify(
   text: string,

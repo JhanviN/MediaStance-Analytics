@@ -7,7 +7,7 @@ import {
   type CausalNode,
   type CausalEdge,
 } from "@/lib/api";
-import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, LABEL_COLORS, ALL_PAIRS } from "@/lib/constants";
+import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, LABEL_COLORS, ALL_PAIRS, pairLabel } from "@/lib/constants";
 import ModelToggle from "@/components/ModelToggle";
 import ErrorBanner from "@/components/ErrorBanner";
 
@@ -435,7 +435,7 @@ export default function CausalityPage() {
           }}
         >
           {ALL_PAIRS.map((p) => (
-            <option key={p}>{p}</option>
+            <option key={p} value={p}>{pairLabel(p)}</option>
           ))}
         </select>
         <select
@@ -475,7 +475,7 @@ export default function CausalityPage() {
           <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
               State Transition Graph —{" "}
-              <span className="mono">{pair}</span>
+              <span className="mono">{pairLabel(pair)}</span>
               {data.graph.date_range && (
                 <span
                   style={{ fontSize: 12, color: "var(--muted)", marginLeft: 8, fontWeight: 400 }}

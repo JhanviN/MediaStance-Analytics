@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ADV_COLOR, ALL_PAIRS } from "@/lib/constants";
+import { ADV_COLOR, ALL_PAIRS, pairLabel } from "@/lib/constants";
 import ErrorBanner from "@/components/ErrorBanner";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
@@ -115,7 +115,7 @@ export default function AttentionPage() {
             onChange={(e) => setPair(e.target.value)}
             style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", padding: "7px 10px", fontSize: 13, fontFamily: "monospace" }}
           >
-            {ALL_PAIRS.map((p) => <option key={p}>{p}</option>)}
+            {ALL_PAIRS.map((p) => <option key={p} value={p}>{pairLabel(p)}</option>)}
           </select>
           <button
             type="submit"

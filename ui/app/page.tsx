@@ -3,11 +3,12 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { fetchSummaryAll, fetchAlerts, type SummaryAll, type Alert } from "@/lib/api";
-import { ADV_COLOR, COOP_COLOR } from "@/lib/constants";
+import { ADV_COLOR, COOP_COLOR, pairLabel } from "@/lib/constants";
 import MetricCard from "@/components/MetricCard";
 import SegmentBar from "@/components/SegmentBar";
 import ModelToggle from "@/components/ModelToggle";
 import ErrorBanner from "@/components/ErrorBanner";
+import DateRangeFilter, { type DateRange } from "@/components/DateRangeFilter";
 
 function PairCardSkeleton() {
   return (
@@ -26,6 +27,7 @@ function PairCardSkeleton() {
 export default function OverviewPage() {
   const router = useRouter();
   const [model, setModel] = useState<"baseline" | "transformer">("baseline");
+  const [dateRange, setDateRange] = useState<DateRange>({ startDate: undefined, endDate: undefined });
   const [data, setData] = useState<SummaryAll | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +39,7 @@ export default function OverviewPage() {
     startTransition(async () => {
       try {
         const [summary, alertsRes] = await Promise.all([
-          fetchSummaryAll(model),
+          fetchSummaryAll(model, dateRange.startDate, dateRange.endDate),
           fetchAlerts(model),
         ]);
         setData(summary);
@@ -46,7 +48,7 @@ export default function OverviewPage() {
         setError(e instanceof Error ? e.message : "Unknown error");
       }
     });
-  }, [model]);
+  }, [model, dateRange]);
 
   // Derive flat array from dict
   const pairsArray = data ? Object.values(data.pairs) : [];
@@ -66,9 +68,12 @@ export default function OverviewPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ fontWeight: 500, fontSize: 20, margin: 0 }}>Overview</h1>
-        <ModelToggle value={model} onChange={setModel} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+          <ModelToggle value={model} onChange={setModel} />
+        </div>
       </div>
 
       {error && <ErrorBanner message={error} />}
@@ -135,7 +140,7 @@ export default function OverviewPage() {
             />
             <MetricCard
               label="Most Adversarial Pair"
-              value={mostAdv?.pair ?? "—"}
+              value={mostAdv ? pairLabel(mostAdv.pair) : "—"}
               sub={mostAdv ? `${mostAdv.percent.adversarial.toFixed(1)}% adversarial` : undefined}
               valueColor={ADV_COLOR}
             />
@@ -177,7 +182,7 @@ export default function OverviewPage() {
                 }}
               >
                 <div className="mono" style={{ fontWeight: 500, fontSize: 15, marginBottom: 10 }}>
-                  {p.pair}
+                  {pairLabel(p.pair)}
                 </div>
                 <SegmentBar
                   adv={p.percent.adversarial}

@@ -1,0 +1,39 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="240" height="240" rx="60" fill="url(#mainGradient)" />
+
+  <path
+    d="M 60 140 L 60 80 L 90 110 L 120 80 L 120 140"
+    stroke="white"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    opacity="0.95"
+  />
+
+  <path
+    d="M 145 110 L 175 80 L 175 140 L 145 140 L 145 100 L 160 100"
+    stroke="url(#accentGradient)"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+
+  <circle cx="75" cy="165" r="3" fill="#10b981" opacity="0.8" />
+  <circle cx="90" cy="160" r="3" fill="#10b981" opacity="0.8" />
+  <circle cx="105" cy="155" r="3" fill="#10b981" opacity="0.8" />
+  <circle cx="155" cy="165" r="3" fill="#3b82f6" opacity="0.8" />
+  <circle cx="170" cy="162" r="3" fill="#3b82f6" opacity="0.8" />
+
+  <defs>
+    <linearGradient id="mainGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#60a5fa" />
+    </linearGradient>
+  </defs>
+</svg>

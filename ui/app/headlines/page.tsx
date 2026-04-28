@@ -4,9 +4,10 @@ import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchHeadlines, type HeadlineItem } from "@/lib/api";
-import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS, LABEL_COLORS } from "@/lib/constants";
+import { ADV_COLOR, COOP_COLOR, NEUT_COLOR, ALL_PAIRS, LABEL_COLORS, pairLabel } from "@/lib/constants";
 import ModelToggle from "@/components/ModelToggle";
 import ErrorBanner from "@/components/ErrorBanner";
+import DateRangeFilter, { type DateRange } from "@/components/DateRangeFilter";
 
 const LABELS = ["", "adversarial", "cooperative", "neutral"];
 
@@ -24,6 +25,7 @@ function HeadlinesInner() {
   const [pair, setPair] = useState(params.get("pair") ?? "IN-US");
   const [model, setModel] = useState<"baseline" | "transformer">("baseline");
   const [label, setLabel] = useState(params.get("label") ?? "");
+  const [dateRange, setDateRange] = useState<DateRange>({ startDate: undefined, endDate: undefined });
   const [items, setItems] = useState<HeadlineItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,10 +39,10 @@ function HeadlinesInner() {
   useEffect(() => {
     setItems(null);
     setError(null);
-    fetchHeadlines(pair, model, label || undefined)
+    fetchHeadlines(pair, model, label || undefined, 100, dateRange.startDate, dateRange.endDate)
       .then((r) => setItems(r.items))
       .catch((e) => setError(e.message));
-  }, [pair, model, label]);
+  }, [pair, model, label, dateRange]);
 
   return (
     <div>
@@ -51,7 +53,7 @@ function HeadlinesInner() {
           onChange={(e) => setPair(e.target.value)}
           style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 6, color: "var(--text)", padding: "5px 10px", fontSize: 13, fontFamily: "monospace" }}
         >
-          {ALL_PAIRS.map((p) => <option key={p}>{p}</option>)}
+          {ALL_PAIRS.map((p) => <option key={p} value={p}>{pairLabel(p)}</option>)}
         </select>
         <select
           value={label}
@@ -61,6 +63,7 @@ function HeadlinesInner() {
           {LABELS.map((l) => <option key={l} value={l}>{l || "all labels"}</option>)}
         </select>
         <ModelToggle value={model} onChange={setModel} />
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
       </div>
 
       {error && <ErrorBanner message={error} />}
