@@ -9,7 +9,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: HF_TOKEN
-        sync: false          # set manually in Render dashboard
+        sync: false
       - key: HF_DATASET_REPO
         value: JhanviN/mediastance-db
       - key: HF_MODEL_REPO
@@ -17,6 +17,6 @@ services:
       - key: SYNC_INTERVAL_MINUTES
         value: "30"
       - key: PIPELINE_INTERVAL_MINUTES
-        value: "0"           # disable in-process pipeline — GitHub Actions handles it
+        value: "0"
       - key: PYTHON_VERSION
         value: "3.11.0"
