@@ -50,14 +50,21 @@ def _run_live_pipeline() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Download DB from HF Dataset, start background scheduler, stop on shutdown."""
+    logger.info(f"Starting up. ROOT={ROOT}, sys.path includes ROOT: {str(ROOT) in sys.path}")
 
     # ── DB sync: download latest predictions.db on startup ───────────────────
     try:
-        from core.db_sync import init_sync, start_background_sync
-        init_sync()          # download DB from HF Dataset (no-op if env vars not set)
-        start_background_sync()  # upload every 30 min
+        import sys
+        import importlib
+        # Ensure repo root is on path
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        db_sync = importlib.import_module("core.db_sync")
+        db_sync.init_sync()
+        db_sync.start_background_sync()
+        logger.info("DB sync initialized successfully")
     except Exception as e:
-        logger.warning(f"DB sync init failed: {e}")
+        logger.warning(f"DB sync init failed: {e} (type: {type(e).__name__}) — running without DB sync")
 
     # ── Download transformer model from HF Hub if missing ────────────────────
     _model_dir = ROOT / "models" / "transformer_bilateral"
