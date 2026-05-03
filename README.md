@@ -219,14 +219,6 @@ ui/             Next.js frontend (8 pages)
 
 ---
 
-## Documentation
-
-- [`data/PROJECT_DOC.md`](data/PROJECT_DOC.md) — complete implementation documentation
-- [`data/RESEARCH_REPORT.md`](data/RESEARCH_REPORT.md) — NLP research report with methodology and results
-- [`data/PRESENTATION_FLOW.md`](data/PRESENTATION_FLOW.md) — slide deck guide with graph file paths
-
----
-
 ## Author
 
 **Jhanvi Nagori** — Department of Computer Science and Engineering, University of Delhi
