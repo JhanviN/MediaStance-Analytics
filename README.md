@@ -1,20 +1,16 @@
----
-title: MediaStance Analytics
-emoji: 📡
-colorFrom: red
-colorTo: blue
-sdk: streamlit
-sdk_version: 1.33.0
-app_file: demo/demo_app.py
-pinned: true
-license: mit
----
-
 # MediaStance Analytics
 
 **Real-time bilateral geopolitical sentiment classification from news headlines.**
 
-Given a headline and a country pair, the system classifies the bilateral relationship as `adversarial`, `cooperative`, or `neutral`.
+Given a news headline and a country pair, the system classifies the bilateral relationship as `adversarial`, `cooperative`, or `neutral` — covering 15 pairs across 7 countries.
+
+## Live Demos
+
+| Service | URL |
+|---|---|
+<!-- | Streamlit Dashboard | [jhanvin-mediastance-analytics.hf.space](https://jhanvin-mediastance-analytics.hf.space) | -->
+| Next.js Frontend | [mediastance.netlify.app](https://tourmaline-klepon-02ce4e.netlify.app/) |
+| FastAPI Backend | [mediastance-analytics-1.onrender.com/docs](https://mediastance-analytics-1.onrender.com/docs) |
 
 ---
 
@@ -25,7 +21,9 @@ Given a headline and a country pair, the system classifies the bilateral relatio
 | TF-IDF + Logistic Regression | 87.50% | 78.89% | 0.973 |
 | DistilBERT (fine-tuned) | **87.84%** | **78.03%** | **0.977** |
 
-15 bilateral pairs · 7 countries · 18,076 predictions in DB · Temperature-calibrated confidence
+> The human gold test set (280 rows, 100% human-annotated) is the honest benchmark. The mixed test set (2,785 rows, 87% synthetic) measures task learning.
+
+38,000+ predictions in DB · 15 bilateral pairs · 7 countries · Temperature-calibrated confidence (ECE −46%)
 
 ---
 
@@ -33,40 +31,42 @@ Given a headline and a country pair, the system classifies the bilateral relatio
 
 **Countries:** India (IN), China (CN), USA (US), Russia (RU), Pakistan (PK), Iran (IR), Israel (IL)
 
-**Pairs (15):** CN-IN, CN-IR, CN-PK, CN-RU, CN-US, IL-IN, IL-IR, IL-US, IN-IR, IN-PK, IN-RU, IN-US, IR-RU, IR-US, RU-US
-
----
-
-## Quick Start
-
-```bash
-pip install -r requirements.txt
-
-# Dashboard
-streamlit run demo/demo_app.py
-
-# API (auto-runs live pipeline every 60 min)
-uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
-
-# Classify a headline
-python scripts/predict.py -t "India and China sign trade deal" --pair IN-CN
-
-# Live pipeline (manual run)
-python scripts/live_pipeline.py --once --model baseline
-```
+**Pairs (15):** CN-IN · CN-IR · CN-PK · CN-RU · CN-US · IL-IN · IL-IR · IL-US · IN-IR · IN-PK · IN-RU · IN-US · IR-RU · IR-US · RU-US
 
 ---
 
 ## Architecture
 
 ```
-RSS Feeds (live, every 60 min)
-        ↓
-Live Pipeline → DistilBERT / TF-IDF
-        ↓
-SQLite Predictions DB
-        ↓
-FastAPI (9 endpoints) + Streamlit Dashboard (7 pages)
+┌─────────────────────────────────────────────────────┐
+│  DATA SOURCES                                        │
+│  RSS Feeds (live)  │  GDELT (historical)  │ Synthetic│
+└────────────────────┴──────────────────────┴──────────┘
+              ↓
+┌─────────────────────────────────────────────────────┐
+│  DATA PIPELINE                                       │
+│  collect → label → merge → split → train            │
+└─────────────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────┐
+│  NLP MODELS                                          │
+│  TF-IDF + LR (baseline)  │  DistilBERT (fine-tuned) │
+└──────────────────────────┴──────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────────────┐
+│  PREDICTIONS DATABASE (SQLite, 38k+ rows)            │
+│  Persisted in HF Dataset repo — synced every 30 min │
+└─────────────────────────────────────────────────────┘
+              ↓
+┌──────────────────┐        ┌──────────────────────────┐
+│  FastAPI (REST)  │        │  Next.js + Streamlit      │
+│  9 endpoints     │ ←────→ │  8 dashboard pages        │
+└──────────────────┘        └──────────────────────────┘
+              ↑
+┌─────────────────────────────────────────────────────┐
+│  LIVE PIPELINE (GitHub Actions, daily 06:00 UTC)     │
+│  RSS → predict (both models) → DB → HF Dataset sync │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -75,31 +75,86 @@ FastAPI (9 endpoints) + Streamlit Dashboard (7 pages)
 
 | Page | Description |
 |---|---|
-|  Overview | All 15 pairs, color-coded sentiment, active alerts |
-|  Trends | Daily timeline with rolling average |
-|  Alerts | Adversarial spike detection |
-|  Headlines | Browse by pair, label, confidence |
-|  Compare Pairs | Side-by-side comparison |
-|  Live Predict | Classify any headline + historical context |
-|  Attention | Token attention heatmap (model interpretability) |
+| Overview | All 15 pairs, color-coded sentiment bars, active alerts |
+| Trends | Daily time series with 7-day rolling average, date filters |
+| Alerts | Adversarial spike detection, configurable threshold and window |
+| Headlines | Browse by pair, label, date, confidence |
+| Compare Pairs | Side-by-side distribution comparison |
+| Live Predict | Real-time classification of any headline |
+| Attention | Token attention heatmap (model interpretability) |
+| Causality | State transition graph, recurring patterns |
 
 ---
 
 ## API Endpoints
 
 ```
-POST /classify              — single headline
-POST /classify/batch        — up to 50 headlines
-GET  /summary?pair=IN-US    — label distribution
-GET  /summary/all           — all 15 pairs
-GET  /trends?pair=CN-US     — daily time series
-GET  /headlines?pair=IL-IR  — browse predictions
+POST /classify              — single headline classification
+POST /classify/batch        — up to 50 headlines per request
+GET  /summary/all           — distribution across all 15 pairs
+GET  /trends?pair=CN-US     — daily time series with rolling average
+GET  /headlines?pair=IL-IR  — browse predictions by pair and label
 GET  /alerts                — adversarial spike detection
-GET  /compare?pair1=IN-US&pair2=CN-US
-GET  /health
+GET  /compare               — side-by-side pair comparison
+GET  /causality             — state transition graph data
+GET  /health                — health check
 ```
 
-Docs: `http://127.0.0.1:8000/docs`
+Interactive docs: `https://mediastance-analytics-1.onrender.com/docs`
+
+---
+
+## Key Technical Decisions
+
+**Entity-aware input encoding**
+Pair prefix prepended to every headline: `IN-CN: India and China hold border talks`. This teaches the model which bilateral relationship to evaluate — without it, the same headline gets identical encoding regardless of which pair is queried.
+
+**Three-source data strategy with priority ordering**
+Human annotation (highest priority, always kept) → GDELT weak supervision (capped at 50 rows per pair/label bucket due to ~40% noise) → Synthetic augmentation (fills gaps, lowest priority). Implemented in `scripts/merge_augmented_data.py`.
+
+**Two test sets**
+Mixed test set (2,785 rows, 87% synthetic) measures task learning. Human gold test set (280 rows, 100% human-labeled) is the honest real-world benchmark. Both reported transparently.
+
+**Temperature scaling**
+Post-hoc confidence calibration (T=1.5276). ECE reduced from 0.0647 → 0.0346 (46% improvement). Makes confidence thresholds in `/alerts` meaningful.
+
+**Macro F1 as primary metric**
+Penalizes poor performance on any single class equally — the right metric for a balanced 3-class problem.
+
+---
+
+## Deployment
+
+| Component | Platform | Notes |
+|---|---|---|
+| Streamlit dashboard | HF Spaces (free) | Docker, port 7860 |
+| FastAPI backend | Render (free) | Docker, CPU-only PyTorch |
+| Next.js frontend | Netlify (free) | Static export |
+| Predictions DB | HF Dataset repo | `JhanviN/mediastance-db` |
+| Transformer model | HF Model repo | `JhanviN/mediastance-deploy` |
+| Live pipeline | GitHub Actions | Daily at 06:00 UTC |
+
+**Persistent storage pattern:** Both HF Spaces and Render use ephemeral containers. `core/db_sync.py` downloads `predictions.db` from the HF Dataset repo on startup and uploads it back every 30 minutes — platform-agnostic, requires only `HF_TOKEN` and `HF_DATASET_REPO` env vars.
+
+---
+
+## Quick Start
+
+```bash
+pip install -r requirements.txt
+
+# Streamlit dashboard
+streamlit run main/main_app.py
+
+# FastAPI backend
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+
+# Classify a headline
+python scripts/predict.py -t "India and China sign trade deal" --pair IN-CN
+
+# Live pipeline (single run)
+python scripts/live_pipeline.py --once --model both
+```
 
 ---
 
@@ -109,15 +164,15 @@ Docs: `http://127.0.0.1:8000/docs`
 # 1. Collect data
 python scripts/collect_corpus.py --feeds 50 --merge
 python scripts/fetch_gdelt.py --days 30 --out data/gdelt_raw.csv
-python scripts/generate_synthetic.py --backend lmstudio --per-class 200 --out data/synthetic_raw.csv
+python scripts/generate_synthetic.py --backend lmstudio --per-class 200
 
-# 2. Merge and split
-python scripts/merge_augmented_data.py --gdelt-cap 50 --cap-per-class 9999
+# 2. Merge (human > GDELT > synthetic) and split
+python scripts/merge_augmented_data.py --gdelt-cap 50 --cap-per-class 600
 python scripts/split_data.py --input data/labeled_dataset_augmented.csv
 
 # 3. Train
 python scripts/train_baseline.py
-python scripts/train_transformer.py --epochs 5 --batch-size 16
+python scripts/train_transformer.py --epochs 5 --batch-size 32
 
 # 4. Calibrate confidence
 python scripts/calibrate_model.py
@@ -127,44 +182,51 @@ python scripts/evaluate.py
 python scripts/evaluate_human.py
 python scripts/plot_training.py
 
-# 6. Populate DB with historical data
-python scripts/predict_batch.py --input data/gdelt_raw.csv --model baseline
+# 6. Seed predictions DB
+python scripts/predict_batch.py --input data/gdelt_raw.csv --model both
 ```
-
----
-
-## Key Technical Details
-
-- **Entity-aware input:** Pair prepended to headline (`IN-CN: headline text`) so the model knows which relationship to evaluate
-- **Macro F1:** Used instead of accuracy — penalizes poor performance on any single class equally
-- **Temperature scaling:** Calibrated confidence (T=1.5276, ECE improved 46%)
-- **Two test sets:** Mixed (87% synthetic) + human gold (100% human-labeled) for honest evaluation
-- **APScheduler:** Live pipeline runs automatically inside the FastAPI process — no cron jobs needed
 
 ---
 
 ## Project Structure
 
 ```
-api/                    FastAPI serving layer
-core/                   RSS fetching, config
-data/                   Datasets and databases
-demo/                   Streamlit dashboard
-models/                 Trained model files
-nlp/                    Inference, analytics, label mapping
-results/                Evaluation outputs and plots
-scripts/                Training, evaluation, data pipeline scripts
+api/            FastAPI serving layer (9 endpoints)
+core/           RSS fetching, config, DB sync
+data/           Datasets, databases, documentation
+main/           Streamlit dashboard
+models/         Trained model files
+nlp/            Inference, analytics, label mapping, causality
+results/        Evaluation outputs and plots
+scripts/        Training, evaluation, data pipeline scripts
+ui/             Next.js frontend (8 pages)
 ```
+
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+|---|---|
+| NLP models | HuggingFace Transformers, scikit-learn, PyTorch |
+| API | FastAPI, Uvicorn, Pydantic, APScheduler |
+| Dashboard (Streamlit) | Streamlit, Plotly |
+| Dashboard (Next.js) | Next.js 16, React 19, Recharts, TypeScript |
+| Storage | SQLite, HuggingFace Hub (dataset repo) |
+| Data pipeline | feedparser, BeautifulSoup4, GDELT 2.0 |
+| Deployment | Docker, Render, Netlify, HF Spaces |
+| CI/CD | GitHub Actions |
 
 ---
 
 ## Documentation
 
-- `PROJECT_DOC.md` — complete implementation documentation
-- `RESEARCH_REPORT.md` — NLP research report with methodology and results
-  
+- [`data/PROJECT_DOC.md`](data/PROJECT_DOC.md) — complete implementation documentation
+- [`data/RESEARCH_REPORT.md`](data/RESEARCH_REPORT.md) — NLP research report with methodology and results
+- [`data/PRESENTATION_FLOW.md`](data/PRESENTATION_FLOW.md) — slide deck guide with graph file paths
 
-### Author
+---
 
-Jhanvi N  
-Full-stack Developer | Passionate about building interactive and efficient web applications.
+## Author
+
+**Jhanvi Nagori** — Department of Computer Science and Engineering, University of Delhi
