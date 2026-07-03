@@ -221,4 +221,4 @@ ui/             Next.js frontend (8 pages)
 
 ## Author
 
-**Jhanvi Nagori** — Department of Computer Science and Engineering, University of Delhi
+**Jhanvi Nagori** - Department of Computer Science and Engineering, University of Delhi
