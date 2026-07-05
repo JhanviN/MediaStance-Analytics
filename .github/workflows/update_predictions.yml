@@ -65,7 +65,7 @@ jobs:
       - name: Run live pipeline
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python scripts/live_pipeline.py --once --model both
+        run: python pipeline/live_pipeline.py --once --model both
 
       - name: Upload updated predictions DB to HF Dataset
         env:

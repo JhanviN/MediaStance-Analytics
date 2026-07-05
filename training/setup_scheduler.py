@@ -24,7 +24,7 @@ def create_task(interval_minutes: int = 60) -> None:
     LOG_DIR.mkdir(exist_ok=True)
 
     python_exe = sys.executable
-    script = ROOT / "scripts" / "live_pipeline.py"
+    script = ROOT / "pipeline" / "live_pipeline.py"
     log_file = LOG_DIR / "scheduler.log"
 
     # Command that runs the pipeline and appends to log
