@@ -1,13 +1,13 @@
 """
 Attention visualization for DistilBERT.
 
-Extracts attention weights from the last layer and shows which tokens
-the model focuses on when making adversarial/cooperative/neutral predictions.
+Extracts CLS-token attention weights averaged across all layers/heads,
+showing which tokens the model focuses on per prediction.
 
 Usage:
-    python scripts/attention_viz.py
-    python scripts/attention_viz.py --text "India and China sign trade deal" --pair IN-CN
-    python scripts/attention_viz.py --examples 5  # visualize 5 test examples
+    python nlp/attention_viz.py
+    python nlp/attention_viz.py --text "India and China sign trade deal" --pair IN-CN
+    python nlp/attention_viz.py --examples 5  # visualize 5 test examples
 
 Outputs:
     results/attention/attention_<label>_<pair>.png  — heatmap per example

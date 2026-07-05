@@ -36,7 +36,7 @@ logger = logging.getLogger("mediastance")
 def _run_live_pipeline() -> None:
     """Called by scheduler every N minutes — collect fresh headlines and predict."""
     try:
-        sys.path.insert(0, str(ROOT / "scripts"))
+        sys.path.insert(0, str(ROOT / "pipeline"))
         from live_pipeline import run_once
         db_conn = connect(ROOT / "data" / "predictions.db")
         init_predictions_db(db_conn)
